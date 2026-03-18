@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SCLX 1.2 Ledger Exchange Format",
+  "type": "object",
+  "required": [
+    "format",
+    "version",
+    "organization",
+    "chartOfAccounts",
+    "transactions"
+  ],
+  "properties": {
+    "format": {
+      "const": "SCLX"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^1\\.2$"
+    },
+    "exportedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "organization": {
+      "type": "object",
+      "required": [
+        "organizationId",
+        "name"
+      ],
+      "properties": {
+        "organizationId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "parentOrganization": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "baseCurrency": {
+          "type": "string"
+        },
+        "fiscalYearStart": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "fiscalYearEnd": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        }
+      }
+    },
+    "chartOfAccounts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "number",
+          "name",
+          "type"
+        ],
+        "properties": {
+          "number": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "ASSET",
+              "LIABILITY",
+              "NET_ASSETS",
+              "REVENUE",
+              "EXPENSE"
+            ]
+          },
+          "parent": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "increaseSide": {
+            "enum": [
+              "DEBIT",
+              "CREDIT"
+            ]
+          },
+          "openingBalance": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "supplementalKinds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "transactions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "transactionId",
+          "transactionDate",
+          "lines"
+        ],
+        "properties": {
+          "transactionId": {
+            "type": "string"
+          },
+          "transactionDate": {
+            "type": "string",
+            "format": "date"
+          },
+          "postingDate": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "enum": [
+              "DRAFT",
+              "POSTED",
+              "VOID",
+              "REVERSED"
+            ]
+          },
+          "lines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "accountId"
+              ],
+              "properties": {
+                "lineId": {
+                  "type": "string"
+                },
+                "accountId": {
+                  "type": "string"
+                },
+                "debit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "credit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "fundId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "budgetId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "personId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "eventId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "documentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "memo": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array"
+    },
+    "budgets": {
+      "type": "array"
+    },
+    "supplies": {
+      "type": "array"
+    },
+    "bankingItems": {
+      "type": "array"
+    },
+    "outstandingItems": {
+      "type": "array"
+    },
+    "otherAssetItems": {
+      "type": "array"
+    },
+    "bankStatementImports": {
+      "type": "array"
+    },
+    "extensions": {
+      "type": "object"
+    }
+  }
+}
