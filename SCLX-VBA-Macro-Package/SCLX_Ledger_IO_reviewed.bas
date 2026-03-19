@@ -625,20 +625,20 @@ Private Sub WriteOneSplit(ws As Worksheet, ByVal r As Long, grp As Variant, line
     If Not wbk Is Nothing Then
         incomeCat = SafeText(ValueOrFallback(wbk, "incomeCategory", ""))
         expenseCat = SafeText(ValueOrFallback(wbk, "expenseCategory", ""))
-        amt = CDbl(Val(Replace(SafeText(ValueOrFallback(wbk, "amount", "0.00")), ",", "")))
+        amt = ParseJsonNumber(ValueOrFallback(wbk, "amount", "0.00"))
         ws.Cells(r, grp(3)).Value = ValueOrFallback(wbk, "usedFor", "")
         ws.Cells(r, grp(4)).Value = ValueOrFallback(wbk, "itemNumber", "")
         ws.Cells(r, grp(5)).Value = ValueOrFallback(wbk, "quantity", "")
         ws.Cells(r, grp(6)).Value = ValueOrFallback(wbk, "reserved", "")
     Else
-        If CDbl(Val(Replace(SafeText(ValueOrFallback(line, "debit", "0")), ",", ""))) > 0 Then
+        If ParseJsonNumber(ValueOrFallback(line, "debit", "0")) > 0 Then
             expenseCat = SafeText(ValueOrFallback(line, "accountId", ""))
             incomeCat = ""
-            amt = CDbl(Val(SafeText(ValueOrFallback(line, "debit", "0"))))
+            amt = ParseJsonNumber(ValueOrFallback(line, "debit", "0"))
         Else
             incomeCat = SafeText(ValueOrFallback(line, "accountId", ""))
             expenseCat = ""
-            amt = CDbl(Val(SafeText(ValueOrFallback(line, "credit", "0"))))
+            amt = ParseJsonNumber(ValueOrFallback(line, "credit", "0"))
         End If
     End If
 
@@ -664,7 +664,7 @@ Private Sub ImportOutstandingItems(items As Variant)
         ws.Cells(r, COL_OUT_DETAILS).Value = ValueOrFallback(item, "detailsNotes", "")
         ws.Cells(r, COL_OUT_MERCHANT).Value = ValueOrFallback(item, "fromToCardMerchant", "")
         ws.Cells(r, COL_OUT_ACCOUNT).Value = ValueOrFallback(item, "accountForPaymentOrDeposit", "")
-        ws.Cells(r, COL_OUT_AMOUNT).Value = CDbl(Val(SafeText(ValueOrFallback(item, "amount", "0"))))
+        ws.Cells(r, COL_OUT_AMOUNT).Value = ParseJsonNumber(ValueOrFallback(item, "amount", "0"))
         ws.Cells(r, COL_OUT_DATE_REVERSED).Value = ParseIsoDate(ValueOrFallback(item, "dateReversed", Null))
         ws.Cells(r, COL_OUT_REASON_APPROVAL).Value = ValueOrFallback(item, "reversalReasonAndApproval", "")
     Next item
@@ -879,10 +879,12 @@ Private Function GuessOutstandingKind(ws As Worksheet, ByVal r As Long) As Strin
     Dim ref As String
     Dim amt As Double
 
-    ref = SafeText(ws.Cells(r, COL_OUT_TRANSFER_OR_CHECK).Value)
+    ref = UCase$(SafeText(ws.Cells(r, COL_OUT_TRANSFER_OR_CHECK).Value))
     amt = CDbl(ValZero(ws.Cells(r, COL_OUT_AMOUNT).Value))
 
-    If Len(ref) > 0 Then
+    If InStr(ref, "TR") > 0 Or InStr(ref, "XFER") > 0 Or InStr(ref, "TRANSFER") > 0 Then
+        GuessOutstandingKind = "TRANSFER"
+    ElseIf Len(ref) > 0 Then
         GuessOutstandingKind = "CHECK"
     ElseIf amt >= 0 Then
         GuessOutstandingKind = "DEPOSIT"
@@ -1003,6 +1005,10 @@ Private Function ValZero(v As Variant) As Double
     ValZero = CDbl(Val(Replace(SafeText(v), ",", "")))
 End Function
 
+Private Function ParseJsonNumber(ByVal v As Variant) As Double
+    ParseJsonNumber = CDbl(Val(Replace(SafeText(v), ",", "")))
+End Function
+
 Private Function NullOrNumber(v As Variant) As Variant
     If Len(SafeText(v)) = 0 Then
         NullOrNumber = Null
@@ -1056,15 +1062,30 @@ End Function
 
 Private Function ParseIsoDate(v As Variant) As Variant
     Dim s As String
+    Dim y As Integer
+    Dim m As Integer
+    Dim d As Integer
+
     s = SafeText(v)
 
     If Len(s) = 0 Then
-        ParseIsoDate = ""
-    ElseIf IsDate(Left$(s, 10)) Then
-        ParseIsoDate = DateValue(Left$(s, 10))
-    Else
-        ParseIsoDate = ""
+        ParseIsoDate = vbNullString
+        Exit Function
     End If
+
+    s = Left$(s, 10)
+
+    If Len(s) = 10 And Mid$(s, 5, 1) = "-" And Mid$(s, 8, 1) = "-" Then
+        On Error GoTo BadDate
+        y = CInt(Left$(s, 4))
+        m = CInt(Mid$(s, 6, 2))
+        d = CInt(Right$(s, 2))
+        ParseIsoDate = DateSerial(y, m, d)
+        Exit Function
+    End If
+
+BadDate:
+    ParseIsoDate = vbNullString
 End Function
 
 Private Function NormalizeId(ByVal prefix As String, ByVal raw As String) As String
@@ -1120,15 +1141,33 @@ End Function
 Private Sub WriteTextFile(ByVal path As String, ByVal text As String)
     Dim ff As Integer
     ff = FreeFile
+
+    On Error GoTo CleanFail
     Open path For Output As #ff
-    Print #ff, text
+    Print #ff, text;
     Close #ff
+    Exit Sub
+
+CleanFail:
+    On Error Resume Next
+    Close #ff
+    On Error GoTo 0
+    Err.Raise Err.Number, Err.Source, Err.Description
 End Sub
 
 Private Function ReadTextFile(ByVal path As String) As String
     Dim ff As Integer
     ff = FreeFile
+
+    On Error GoTo CleanFail
     Open path For Input As #ff
     ReadTextFile = Input$(LOF(ff), ff)
     Close #ff
+    Exit Function
+
+CleanFail:
+    On Error Resume Next
+    Close #ff
+    On Error GoTo 0
+    Err.Raise Err.Number, Err.Source, Err.Description
 End Function

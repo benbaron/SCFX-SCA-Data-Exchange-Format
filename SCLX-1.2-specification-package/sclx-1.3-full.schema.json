@@ -1,0 +1,1700 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://scaledger.example/schema/sclx-1.3-full.schema.json",
+  "title": "SCLX 1.3 - SCALedger Canonical Ledger Exchange Format",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "format",
+    "version",
+    "exportedAt",
+    "organization",
+    "reportingPeriod",
+    "chartOfAccounts",
+    "funds",
+    "budgets",
+    "people",
+    "events",
+    "documents",
+    "transactions"
+  ],
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "SCLX"
+    },
+    "version": {
+      "type": "string",
+      "const": "1.3"
+    },
+    "exportedAt": {
+      "$ref": "#/$defs/offsetDateTime"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "compatibility": {
+      "$ref": "#/$defs/compatibility"
+    },
+    "organization": {
+      "$ref": "#/$defs/organization"
+    },
+    "reportingPeriod": {
+      "$ref": "#/$defs/reportingPeriod"
+    },
+    "chartOfAccounts": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/account"
+      },
+      "default": []
+    },
+    "funds": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fund"
+      },
+      "default": []
+    },
+    "budgets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/budget"
+      },
+      "default": []
+    },
+    "people": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/person"
+      },
+      "default": []
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      },
+      "default": []
+    },
+    "documents": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/document"
+      },
+      "default": []
+    },
+    "transactions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/transaction"
+      },
+      "default": []
+    },
+    "bankingItems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/bankingItem"
+      },
+      "default": []
+    },
+    "outstandingItems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/outstandingItem"
+      },
+      "default": []
+    },
+    "otherAssetItems": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/otherAssetItem"
+      },
+      "default": []
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/asset"
+      },
+      "default": []
+    },
+    "supplies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/supply"
+      },
+      "default": []
+    },
+    "bankStatementImports": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/bankStatementImport"
+      },
+      "default": []
+    },
+    "extensions": {
+      "$ref": "#/$defs/extensions"
+    }
+  },
+  "$defs": {
+    "date": {
+      "type": "string",
+      "format": "date"
+    },
+    "offsetDateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "decimalAmount": {
+      "type": "string",
+      "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+    },
+    "positiveDecimalAmount": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{2}$"
+    },
+    "nonNegativeDecimalAmount": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]{2}$"
+    },
+    "idString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringOrNull": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "integerOrNull": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "booleanOrNull": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "extensions": {
+      "type": "object",
+      "default": {}
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "minimumReaderVersion": {
+          "type": "string"
+        },
+        "lossyDowngradeTo": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      }
+    },
+    "accountType": {
+      "type": "string",
+      "enum": [
+        "ASSET",
+        "LIABILITY",
+        "NET_ASSETS",
+        "REVENUE",
+        "EXPENSE"
+      ]
+    },
+    "increaseSide": {
+      "type": "string",
+      "enum": [
+        "DEBIT",
+        "CREDIT"
+      ]
+    },
+    "supplementalKind": {
+      "type": "string",
+      "enum": [
+        "RECEIVABLE",
+        "PREPAID_EXPENSE",
+        "OTHER_ASSET",
+        "DEFERRED_REVENUE",
+        "PAYABLE",
+        "OTHER_LIABILITY"
+      ]
+    },
+    "personKind": {
+      "type": "string",
+      "enum": [
+        "VENDOR",
+        "CUSTOMER",
+        "MEMBER",
+        "OFFICER",
+        "BRANCH",
+        "OTHER"
+      ]
+    },
+    "documentType": {
+      "type": "string",
+      "enum": [
+        "RECEIPT",
+        "INVOICE",
+        "CHECK_IMAGE",
+        "DEPOSIT_SLIP",
+        "BANK_STATEMENT",
+        "CONTRACT",
+        "APPROVAL_RECORD",
+        "OTHER"
+      ]
+    },
+    "transactionStatus": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "POSTED",
+        "VOID",
+        "REVERSED"
+      ]
+    },
+    "transactionSource": {
+      "type": "string",
+      "enum": [
+        "MANUAL",
+        "BANK_IMPORT",
+        "OFX_IMPORT",
+        "CSV_IMPORT",
+        "OPENING_BALANCE",
+        "SYSTEM_GENERATED",
+        "ADJUSTMENT"
+      ]
+    },
+    "timingValue": {
+      "type": "string",
+      "enum": [
+        "NOW",
+        "PREVIOUSLY",
+        "LATER",
+        "NONE"
+      ]
+    },
+    "bankingItemKind": {
+      "type": "string",
+      "enum": [
+        "CHECK",
+        "DEPOSIT",
+        "OTHER_WITHDRAWAL",
+        "OTHER_CREDIT",
+        "BANK_FEE",
+        "INTEREST",
+        "ADJUSTMENT"
+      ]
+    },
+    "bankingItemSource": {
+      "type": "string",
+      "enum": [
+        "MANUAL",
+        "BANK_IMPORT",
+        "BANK_RECONCILIATION",
+        "OFX_IMPORT",
+        "SYSTEM_GENERATED"
+      ]
+    },
+    "bankingItemStatus": {
+      "type": "string",
+      "enum": [
+        "PENDING",
+        "OUTSTANDING",
+        "CLEARED",
+        "VOID"
+      ]
+    },
+    "outstandingItemKind": {
+      "type": "string",
+      "enum": [
+        "CHECK",
+        "TRANSFER",
+        "DEPOSIT",
+        "INCOMING_CHECK",
+        "CARD_ITEM",
+        "OTHER"
+      ]
+    },
+    "outstandingItemStatus": {
+      "type": "string",
+      "enum": [
+        "OUTSTANDING",
+        "CLEARED",
+        "REVERSED",
+        "VOID",
+        "PENDING"
+      ]
+    },
+    "otherAssetItemType": {
+      "type": "string",
+      "enum": [
+        "CASH_ADVANCE",
+        "SITE_SECURITY_DEPOSIT",
+        "OTHER"
+      ]
+    },
+    "otherAssetItemStatus": {
+      "type": "string",
+      "enum": [
+        "OUTSTANDING",
+        "PAID",
+        "RETURNED",
+        "CLEARED",
+        "VOID"
+      ]
+    },
+    "assetType": {
+      "type": "string",
+      "enum": [
+        "REGALIA",
+        "EQUIPMENT",
+        "FURNITURE",
+        "BANNER",
+        "SITE_EQUIPMENT",
+        "LOANER_GEAR",
+        "OTHER"
+      ]
+    },
+    "removalType": {
+      "type": "string",
+      "enum": [
+        "LOST",
+        "SOLD",
+        "DONATED",
+        "DESTROYED",
+        "RETURNED"
+      ]
+    },
+    "budgetRevenueCategory": {
+      "type": "string",
+      "enum": [
+        "RestrictedRevenue",
+        "UnrestrictedRevenue",
+        "GeneralRevenue"
+      ]
+    },
+    "budgetExpenseCategory": {
+      "type": "string",
+      "enum": [
+        "Officers",
+        "Supplies",
+        "AdminMaintenance",
+        "EquipmentRegalia",
+        "Marketing",
+        "Overhead"
+      ]
+    },
+    "statementKind": {
+      "type": "string",
+      "enum": [
+        "BANK",
+        "CREDIT_CARD"
+      ]
+    },
+    "confirmationStatus": {
+      "type": "string",
+      "enum": [
+        "CONFIRMED",
+        "UNCONFIRMED",
+        "UNKNOWN"
+      ]
+    },
+    "organization": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "organizationId",
+        "name",
+        "baseCurrency",
+        "fiscalYearStart",
+        "fiscalYearEnd"
+      ],
+      "properties": {
+        "organizationId": {
+          "$ref": "#/$defs/idString"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parentOrganization": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "baseCurrency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "fiscalYearStart": {
+          "$ref": "#/$defs/date"
+        },
+        "fiscalYearEnd": {
+          "$ref": "#/$defs/date"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "reportingPeriod": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "startDate",
+        "endDate"
+      ],
+      "properties": {
+        "startDate": {
+          "$ref": "#/$defs/date"
+        },
+        "endDate": {
+          "$ref": "#/$defs/date"
+        },
+        "label": {
+          "type": "string"
+        },
+        "fiscalYear": {
+          "type": "integer"
+        },
+        "periodType": {
+          "type": "string",
+          "enum": [
+            "MONTH",
+            "QUARTER",
+            "CALENDAR_YEAR",
+            "FISCAL_YEAR",
+            "CUSTOM"
+          ]
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "Number",
+        "Name",
+        "Type",
+        "IncreaseSide",
+        "OpeningBalance"
+      ],
+      "properties": {
+        "Number": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Type": {
+          "$ref": "#/$defs/accountType"
+        },
+        "Parent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "IncreaseSide": {
+          "$ref": "#/$defs/increaseSide"
+        },
+        "OpeningBalance": {
+          "$ref": "#/$defs/decimalAmount"
+        },
+        "SupplementalKinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/supplementalKind"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "accountId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "code": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "subtype": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "active": {
+          "type": "boolean",
+          "default": true
+        },
+        "reportingTags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "fund": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fundId",
+        "name",
+        "restricted"
+      ],
+      "properties": {
+        "fundId": {
+          "$ref": "#/$defs/idString"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "restricted": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "budgetLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventName",
+        "budgetedAmount",
+        "revenueCategory",
+        "expenseCategory"
+      ],
+      "properties": {
+        "eventName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "budgetedAmount": {
+          "$ref": "#/$defs/decimalAmount"
+        },
+        "revenueCategory": {
+          "$ref": "#/$defs/budgetRevenueCategory"
+        },
+        "expenseCategory": {
+          "$ref": "#/$defs/budgetExpenseCategory"
+        },
+        "accountId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "budgetId",
+        "name",
+        "fiscalYear",
+        "fundId",
+        "active"
+      ],
+      "properties": {
+        "budgetId": {
+          "$ref": "#/$defs/idString"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fiscalYear": {
+          "type": "integer"
+        },
+        "fundId": {
+          "$ref": "#/$defs/idString"
+        },
+        "active": {
+          "type": "boolean"
+        },
+        "description": {
+          "type": "string"
+        },
+        "lines": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/budgetLine"
+          },
+          "default": []
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "person": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "personId",
+        "displayName",
+        "kind"
+      ],
+      "properties": {
+        "personId": {
+          "$ref": "#/$defs/idString"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "$ref": "#/$defs/personKind"
+        },
+        "email": {
+          "type": "string",
+          "format": "email"
+        },
+        "phone": {
+          "type": "string"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "name"
+      ],
+      "properties": {
+        "eventId": {
+          "$ref": "#/$defs/idString"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "startDate": {
+          "$ref": "#/$defs/date"
+        },
+        "endDate": {
+          "$ref": "#/$defs/date"
+        },
+        "hostingOrganizationId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "documentId",
+        "documentType"
+      ],
+      "properties": {
+        "documentId": {
+          "$ref": "#/$defs/idString"
+        },
+        "documentType": {
+          "$ref": "#/$defs/documentType"
+        },
+        "referenceNumber": {
+          "type": "string"
+        },
+        "documentDate": {
+          "$ref": "#/$defs/date"
+        },
+        "fileName": {
+          "type": "string"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "policyRequired": {
+          "type": "boolean"
+        },
+        "committeeApprovalRef": {
+          "type": "string"
+        },
+        "approvedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "approvalDate": {
+          "$ref": "#/$defs/date"
+        },
+        "notes": {
+          "type": "string"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "ledgerLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "lineId"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "#/$defs/idString"
+        },
+        "lineId": {
+          "$ref": "#/$defs/idString"
+        }
+      }
+    },
+    "workbookLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sheetKey",
+        "ledgerRowIndex"
+      ],
+      "properties": {
+        "sheetKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ledgerRowIndex": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "supplementalRefType": {
+      "type": "string",
+      "enum": [
+        "OUTSTANDING_ITEM",
+        "OTHER_ASSET_ITEM"
+      ]
+    },
+    "supplementalRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "recordType",
+        "recordId"
+      ],
+      "properties": {
+        "recordType": {
+          "$ref": "#/$defs/supplementalRefType"
+        },
+        "recordId": {
+          "$ref": "#/$defs/idString"
+        }
+      }
+    },
+    "transactionLine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "lineId",
+        "accountId",
+        "debit",
+        "credit"
+      ],
+      "properties": {
+        "lineId": {
+          "$ref": "#/$defs/idString"
+        },
+        "accountId": {
+          "$ref": "#/$defs/idString"
+        },
+        "description": {
+          "type": "string"
+        },
+        "debit": {
+          "$ref": "#/$defs/nonNegativeDecimalAmount"
+        },
+        "credit": {
+          "$ref": "#/$defs/nonNegativeDecimalAmount"
+        },
+        "fundId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "budgetId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "eventId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "personId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "documentId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "memo": {
+          "type": "string"
+        },
+        "usedFor": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "itemNumber": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "quantity": {
+          "$ref": "#/$defs/integerOrNull"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "restrictionTag": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "reportSection": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "supplementalRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/supplementalRef"
+          },
+          "default": []
+        },
+        "workbookLink": {
+          "$ref": "#/$defs/workbookLink"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "transaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "transactionId",
+        "transactionDate",
+        "postingDate",
+        "description",
+        "status",
+        "source",
+        "lines"
+      ],
+      "properties": {
+        "transactionId": {
+          "$ref": "#/$defs/idString"
+        },
+        "transactionDate": {
+          "$ref": "#/$defs/date"
+        },
+        "postingDate": {
+          "$ref": "#/$defs/date"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/transactionStatus"
+        },
+        "source": {
+          "$ref": "#/$defs/transactionSource"
+        },
+        "documentIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idString"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "eventId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "approval": {
+          "$ref": "#/$defs/approval"
+        },
+        "bankTiming": {
+          "$ref": "#/$defs/timingValue"
+        },
+        "budgetTiming": {
+          "$ref": "#/$defs/timingValue"
+        },
+        "budgetId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "lines": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/transactionLine"
+          }
+        },
+        "workbookLink": {
+          "$ref": "#/$defs/workbookLink"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "ofxTransaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fitId",
+        "transactionType",
+        "datePosted"
+      ],
+      "properties": {
+        "fitId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "transactionType": {
+          "type": "string",
+          "minLength": 1
+        },
+        "datePosted": {
+          "$ref": "#/$defs/date"
+        },
+        "dateUser": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "dateAvailable": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "checkNumber": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "referenceNumber": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "name": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "memo": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "payeeId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "sic": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "serverTransactionId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "correctFitId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "correctAction": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "bankingItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "bankingItemId",
+        "kind",
+        "clearedDate",
+        "amount"
+      ],
+      "properties": {
+        "bankingItemId": {
+          "$ref": "#/$defs/idString"
+        },
+        "kind": {
+          "$ref": "#/$defs/bankingItemKind"
+        },
+        "bankAccountId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "transactionId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "lineIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idString"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "clearedDate": {
+          "$ref": "#/$defs/date"
+        },
+        "amount": {
+          "$ref": "#/$defs/positiveDecimalAmount"
+        },
+        "checkNumber": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "payee": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "depositDate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "payer": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "depositId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "memo": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/bankingItemSource"
+        },
+        "status": {
+          "$ref": "#/$defs/bankingItemStatus"
+        },
+        "importId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "ofx": {
+          "$ref": "#/$defs/ofxTransaction"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "CHECK"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "checkNumber",
+              "payee"
+            ],
+            "properties": {
+              "depositDate": {
+                "type": "null"
+              },
+              "payer": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "DEPOSIT"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "required": [
+              "depositDate",
+              "payer"
+            ],
+            "properties": {
+              "checkNumber": {
+                "type": "null"
+              },
+              "payee": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "outstandingItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "outstandingItemId",
+        "kind",
+        "ledgerLink",
+        "amount"
+      ],
+      "properties": {
+        "outstandingItemId": {
+          "$ref": "#/$defs/idString"
+        },
+        "kind": {
+          "$ref": "#/$defs/outstandingItemKind"
+        },
+        "ledgerLink": {
+          "$ref": "#/$defs/ledgerLink"
+        },
+        "workbookLink": {
+          "$ref": "#/$defs/workbookLink"
+        },
+        "dateSentOrReceived": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "incomingCheckOrTransferDate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "transferIdOrCheckNumber": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "dateShowsOnStatement": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "personOrBusinessName": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "detailsNotes": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "fromToCardMerchant": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "accountForPaymentOrDeposit": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "amount": {
+          "$ref": "#/$defs/positiveDecimalAmount"
+        },
+        "dateReversed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "reversalReasonAndApproval": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "reversalLedgerLink": {
+          "$ref": "#/$defs/ledgerLink"
+        },
+        "status": {
+          "$ref": "#/$defs/outstandingItemStatus"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "otherAssetItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "otherAssetItemId",
+        "ledgerLink",
+        "type",
+        "amountAsOfPriorYearEnd"
+      ],
+      "properties": {
+        "otherAssetItemId": {
+          "$ref": "#/$defs/idString"
+        },
+        "ledgerLink": {
+          "$ref": "#/$defs/ledgerLink"
+        },
+        "workbookLink": {
+          "$ref": "#/$defs/workbookLink"
+        },
+        "paidTo": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "year": {
+          "type": "integer"
+        },
+        "reason": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "type": {
+          "$ref": "#/$defs/otherAssetItemType"
+        },
+        "typeCode": {
+          "type": "string",
+          "enum": [
+            "C",
+            "S",
+            "O"
+          ]
+        },
+        "eventBudgetLabel": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "amountAsOfPriorYearEnd": {
+          "$ref": "#/$defs/positiveDecimalAmount"
+        },
+        "paidReturnedOnLedgerRowIndex": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "settlementLedgerLink": {
+          "$ref": "#/$defs/ledgerLink"
+        },
+        "status": {
+          "$ref": "#/$defs/otherAssetItemStatus"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "guardian": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "legalName": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "email"
+        },
+        "phone": {
+          "$ref": "#/$defs/stringOrNull"
+        }
+      }
+    },
+    "guardianshipDetailsAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dateAsOf": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "confirmed": {
+          "$ref": "#/$defs/booleanOrNull"
+        },
+        "confirmationStatus": {
+          "$ref": "#/$defs/confirmationStatus"
+        },
+        "notes": {
+          "$ref": "#/$defs/stringOrNull"
+        }
+      }
+    },
+    "guardianshipDetailsSupply": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dateAsOf": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "lastConfirmed": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "returned": {
+          "$ref": "#/$defs/booleanOrNull"
+        },
+        "notes": {
+          "$ref": "#/$defs/stringOrNull"
+        }
+      }
+    },
+    "removalDetailsAsset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "approvedBy": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "approvalDate": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "reason": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "numberRemoved": {
+          "$ref": "#/$defs/integerOrNull"
+        },
+        "removed": {
+          "$ref": "#/$defs/booleanOrNull"
+        },
+        "removalType": {
+          "$ref": "#/$defs/removalType"
+        }
+      }
+    },
+    "removalDetailsSupply": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "approvedBy": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "reason": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "numberRemoved": {
+          "$ref": "#/$defs/integerOrNull"
+        },
+        "removed": {
+          "$ref": "#/$defs/booleanOrNull"
+        },
+        "removalType": {
+          "$ref": "#/$defs/removalType"
+        }
+      }
+    },
+    "asset": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "assetId"
+      ],
+      "properties": {
+        "assetId": {
+          "$ref": "#/$defs/idString"
+        },
+        "dateAcquired": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "description": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "itemCount": {
+          "$ref": "#/$defs/integerOrNull"
+        },
+        "approxValueTotal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+        },
+        "valuePerItem": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+        },
+        "itemType": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/assetType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "usedFor": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "lotPaidTotal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+        },
+        "lotItemCount": {
+          "$ref": "#/$defs/integerOrNull"
+        },
+        "currentGuardian": {
+          "$ref": "#/$defs/guardian"
+        },
+        "guardianshipDetails": {
+          "$ref": "#/$defs/guardianshipDetailsAsset"
+        },
+        "removalDetails": {
+          "$ref": "#/$defs/removalDetailsAsset"
+        },
+        "relatedTransactionIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idString"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "relatedLineIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idString"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "supply": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "supplyId"
+      ],
+      "properties": {
+        "supplyId": {
+          "$ref": "#/$defs/idString"
+        },
+        "itemNumber": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "dateAcquired": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date"
+        },
+        "description": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "count": {
+          "$ref": "#/$defs/integerOrNull"
+        },
+        "approxValueTotal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+        },
+        "valuePerItem": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^-?[0-9]+\\.[0-9]{2}$"
+        },
+        "guardian": {
+          "$ref": "#/$defs/guardian"
+        },
+        "guardianshipDetails": {
+          "$ref": "#/$defs/guardianshipDetailsSupply"
+        },
+        "removalDetails": {
+          "$ref": "#/$defs/removalDetailsSupply"
+        },
+        "additionalNotes": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "relatedTransactionIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idString"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "relatedLineIds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/idString"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    },
+    "balanceSnapshot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "amount",
+        "asOf"
+      ],
+      "properties": {
+        "amount": {
+          "$ref": "#/$defs/decimalAmount"
+        },
+        "asOf": {
+          "$ref": "#/$defs/offsetDateTime"
+        }
+      }
+    },
+    "bankStatementImport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "importId",
+        "sourceFormat",
+        "statementKind",
+        "bankAccount",
+        "statementStart",
+        "statementEnd"
+      ],
+      "properties": {
+        "importId": {
+          "$ref": "#/$defs/idString"
+        },
+        "sourceFormat": {
+          "type": "string",
+          "enum": [
+            "OFX"
+          ]
+        },
+        "sourceVersion": {
+          "type": "string"
+        },
+        "statementKind": {
+          "$ref": "#/$defs/statementKind"
+        },
+        "bankAccount": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "accountId"
+          ],
+          "properties": {
+            "bankId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "accountId": {
+              "type": "string"
+            },
+            "accountType": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          }
+        },
+        "currency": {
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "statementStart": {
+          "$ref": "#/$defs/date"
+        },
+        "statementEnd": {
+          "$ref": "#/$defs/date"
+        },
+        "ledgerBalance": {
+          "$ref": "#/$defs/balanceSnapshot"
+        },
+        "availableBalance": {
+          "$ref": "#/$defs/balanceSnapshot"
+        },
+        "documentId": {
+          "$ref": "#/$defs/stringOrNull"
+        },
+        "extensions": {
+          "$ref": "#/$defs/extensions"
+        }
+      }
+    }
+  }
+}

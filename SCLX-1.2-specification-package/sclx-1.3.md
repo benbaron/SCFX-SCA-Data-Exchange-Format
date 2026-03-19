@@ -1,4 +1,4 @@
-# SCLX 1.0
+# SCLX 1.3
 
 **SCALedger Canonical Ledger Exchange Format**
 
@@ -38,7 +38,7 @@ The top-level document contains both master data and transactions.
 ```json
 {
   "format": "SCLX",
-  "version": "1.0",
+  "version": "1.3",
   "exportedAt": "2026-03-17T14:25:00-06:00",
   "organization": {},
   "reportingPeriod": {},
@@ -244,6 +244,14 @@ Recommended fields:
 * `budgetTiming`
 * `extensions`
 
+* `budgetId`
+* `workbookLink`
+
+SCLX 1.3 adds `transaction.budgetId` for spreadsheet and ledger systems that assign a single budget category at the transaction/header level. This avoids forcing exporters to duplicate one row-level budget label onto every posting line when the source workbook really stores it at the row level.
+
+`transaction.workbookLink` may be used to preserve stable sheet/row provenance for round-tripping.
+
+
 Example:
 
 ```json
@@ -291,6 +299,14 @@ Recommended fields:
 * `restrictionTag`
 * `reportSection`
 
+* `usedFor`
+* `itemNumber`
+* `quantity`
+* `workbookLink`
+
+SCLX 1.3 adds these optional structured line fields for spreadsheet split columns. They allow producer-neutral carriage of common workbook details without forcing everything into `extensions`.
+
+
 Example:
 
 ```json
@@ -310,6 +326,19 @@ Example:
 ```
 
 ---
+
+
+## 5.3 Spreadsheet split-line mapping
+
+Many spreadsheet ledgers store one visible transaction row plus multiple split posting regions. In SCLX, that should be modeled as one `transaction` containing multiple `lines`.
+
+A split region should only produce a `transactionLine` when it contains accounting content such as an amount, income category, or expense category. Descriptive helper fields alone should not create a posting line.
+
+For round-tripping, use:
+- `transaction.workbookLink` for row-level provenance
+- `transactionLine.workbookLink` for split-line provenance
+- `extensions.workbook` for richer producer-specific detail such as visible row numbers, split indexes, or source column letters
+
 
 # 6. Required accounting rules
 
@@ -675,13 +704,15 @@ Your draft recommends semantic versioning with minor versions for additive optio
 ## 13.1 Rules
 
 * `1.0` → initial release
-* `1.1` → added optional fields only
+* `1.1` / `1.2` → additive clarifications and optional structures
+* `1.3` → additive transaction-level budget and workbook-link support, plus structured split-support line fields
 * `2.0` → changed required semantics or incompatible structure
 
 ## 13.2 Compatibility
 
 * readers of `1.x` must ignore unknown optional properties
 * writers should not emit `2.x` unless the target explicitly supports it
+* 1.3 readers should continue to accept 1.2 files without upgrade
 
 ---
 
@@ -690,7 +721,7 @@ Your draft recommends semantic versioning with minor versions for additive optio
 ```json
 {
   "format": "SCLX",
-  "version": "1.0",
+  "version": "1.3",
   "exportedAt": "2026-03-17T14:25:00-06:00",
   "organization": {
     "organizationId": "org-botm-fy2026",

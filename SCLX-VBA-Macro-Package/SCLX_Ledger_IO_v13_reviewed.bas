@@ -16,7 +16,7 @@ Option Explicit
 '   If you paste this directly into the VBA editor, remove the Attribute line.
 '===============================================================================
 
-Private Const SCLX_VERSION As String = "1.2"
+Private Const SCLX_VERSION As String = "1.3"
 
 Private Const SH_SUMMARY As String = "Summary"
 Private Const SH_LEDGER As String = "Ledger"
@@ -28,6 +28,19 @@ Private Const ROW_LEDGER_FIRST As Long = 9
 Private Const ROW_OUT_FIRST As Long = 14
 Private Const ROW_ASSET_FIRST As Long = 11
 Private Const ROW_SUPPLY_FIRST As Long = 10
+
+Private Const CELL_SUM_ORG_NAME As String = "D9"
+Private Const CELL_SUM_PARENT_ORG As String = "D7"
+Private Const CELL_SUM_CURRENCY As String = "H8"
+Private Const CELL_SUM_LEDGER_YEAR As String = "H6"
+Private Const CELL_SUM_REPORT_QTR As String = "H7"
+Private Const CELL_SUM_REPORT_LABEL As String = "I3"
+Private Const CELL_SUM_REPORT_START As String = "T5"
+Private Const CELL_SUM_REPORT_END As String = "T6"
+Private Const CELL_SUM_FY_END As String = "T8"
+
+Private mBudgetNameById As Object
+Private mFundNameById As Object
 
 ' Ledger visible transaction columns
 Private Const COL_LEDGER_ROWNUM As String = "A"
@@ -46,13 +59,13 @@ Private Const COL_LEDGER_MERCHANT As String = "O"
 
 ' Ledger split entry blocks (1..4)
 ' Each group is:
-'   0 Amount
-'   1 Income Category
-'   2 Expense Category
-'   3 Used For
-'   4 Item Num
-'   5 Qty
-'   6 Spare / notes / reserved workbook column
+'   0 Split Row Number
+'   1 Amount
+'   2 Income Category
+'   3 Expense Category
+'   4 Used For
+'   5 Item Num
+'   6 Qty
 Private ledgerSplitCols As Variant
 
 ' Outstanding columns
@@ -110,6 +123,7 @@ Private Const COL_SUP_REASON As String = "O"
 Private Const COL_SUP_NUMBER_REMOVED As String = "P"
 Private Const COL_SUP_ADDITIONAL_NOTES As String = "Q"
 
+
 Public Sub ExportSCLX()
     On Error GoTo EH
 
@@ -125,7 +139,7 @@ Public Sub ExportSCLX()
 
     root("format") = "SCLX"
     root("version") = SCLX_VERSION
-    root("exportedAt") = Format$(Now, "yyyy-mm-dd\Thh:nn:ss")
+    root("exportedAt") = FormatDateTimeOffset(Now)
     root("organization") = ExportOrganization()
     root("reportingPeriod") = ExportReportingPeriod()
     root("chartOfAccounts") = ExportChartOfAccounts()
@@ -151,10 +165,12 @@ EH:
     MsgBox "ExportSCLX failed: " & Err.Description, vbCritical
 End Sub
 
+
 Public Sub ImportSCLX()
     On Error GoTo EH
 
     InitSplitCols
+    ClearImportLookupMaps
 
     Dim path As Variant
     path = Application.GetOpenFilename(FileFilter:="JSON Files (*.json), *.json")
@@ -169,6 +185,8 @@ Public Sub ImportSCLX()
     If Not root.Exists("format") Or CStr(root("format")) <> "SCLX" Then
         Err.Raise vbObjectError + 1000, , "File is not SCLX."
     End If
+
+    BuildImportLookupMaps root
 
     If MsgBox("This will append SCLX data into the workbook tabs." & vbCrLf & _
               "Continue?", vbQuestion + vbOKCancel) <> vbOK Then Exit Sub
@@ -185,25 +203,43 @@ EH:
     MsgBox "ImportSCLX failed: " & Err.Description, vbCritical
 End Sub
 
-'========================
-' Export helpers
-'========================
 
 Private Function ExportOrganization() As Object
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Worksheets(SH_SUMMARY)
 
     Dim d As Object
+    Dim ext As Object
+    Dim nm As String
+    Dim fyStart As String
+    Dim fyEnd As String
+
+    nm = SafeText(ws.Range(CELL_SUM_ORG_NAME).Value)
+    If Len(nm) = 0 Then nm = SafeText(ws.Range("B2").Value)
+
+    fyStart = Format$(DateSerial(SummaryYear(ws), 1, 1), "yyyy-mm-dd")
+    If IsDate(ws.Range(CELL_SUM_FY_END).Value) Then
+        fyEnd = Format$(CDate(ws.Range(CELL_SUM_FY_END).Value), "yyyy-mm-dd")
+    Else
+        fyEnd = Format$(DateSerial(SummaryYear(ws), 12, 31), "yyyy-mm-dd")
+    End If
+
     Set d = CreateObject("Scripting.Dictionary")
-    d("organizationId") = SafeText(ws.Range("B3").Value)
-    d("name") = SafeText(ws.Range("B3").Value)
-    d("parentOrganization") = Null
-    d("baseCurrency") = SafeText(ws.Range("H8").Value)
-    d("fiscalYearStart") = YearStartFromSummary(ws)
-    d("fiscalYearEnd") = YearEndFromSummary(ws)
+    d("organizationId") = NormalizeId("org-", nm)
+    d("name") = nm
+    d("parentOrganization") = SafeOrNull(ws.Range(CELL_SUM_PARENT_ORG).Value)
+    d("baseCurrency") = SafeText(ws.Range(CELL_SUM_CURRENCY).Value)
+    d("fiscalYearStart") = fyStart
+    d("fiscalYearEnd") = fyEnd
+
+    Set ext = CreateObject("Scripting.Dictionary")
+    ext("branchType") = SafeOrNull(ws.Range("D6").Value)
+    ext("location") = SafeOrNull(ws.Range("D8").Value)
+    d("extensions") = ext
 
     Set ExportOrganization = d
 End Function
+
 
 Private Function ExportReportingPeriod() As Object
     Dim ws As Worksheet
@@ -211,10 +247,11 @@ Private Function ExportReportingPeriod() As Object
 
     Dim d As Object
     Set d = CreateObject("Scripting.Dictionary")
-    d("startDate") = YearStartFromSummary(ws)
-    d("endDate") = YearEndFromSummary(ws)
-    d("label") = SafeText(ws.Range("H6").Value) & " Q" & SafeText(ws.Range("H7").Value)
-
+    d("startDate") = DateCellOrFallback(ws.Range(CELL_SUM_REPORT_START).Value, Format$(DateSerial(SummaryYear(ws), 1, 1), "yyyy-mm-dd"))
+    d("endDate") = DateCellOrFallback(ws.Range(CELL_SUM_REPORT_END).Value, Format$(DateSerial(SummaryYear(ws), 12, 31), "yyyy-mm-dd"))
+    d("label") = SafeText(ws.Range(CELL_SUM_REPORT_LABEL).Value)
+    d("fiscalYear") = SummaryYear(ws)
+    d("periodType") = "QUARTER"
     Set ExportReportingPeriod = d
 End Function
 
@@ -294,8 +331,48 @@ Private Function ExportFunds() As Collection
     Set ExportFunds = funds
 End Function
 
+
 Private Function ExportBudgets() As Collection
-    Set ExportBudgets = New Collection
+    Dim coll As New Collection
+    Dim seen As Object
+    Set seen = CreateObject("Scripting.Dictionary")
+
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets(SH_LEDGER)
+
+    Dim r As Long
+    Dim budgetName As String
+    Dim fundName As String
+    Dim budgetId As String
+    Dim d As Object
+
+    For r = ROW_LEDGER_FIRST To FindLastInterestingLedgerRow(ws)
+        If IsLedgerRowUsed(ws, r) Then
+            budgetName = SafeText(ws.Cells(r, COL_LEDGER_BUDGET_CATEGORY).Value)
+            fundName = SafeText(ws.Cells(r, COL_LEDGER_FUND).Value)
+
+            If Len(budgetName) > 0 And Len(fundName) > 0 Then
+                budgetId = CStr(BudgetIdFromFields(budgetName, fundName))
+
+                If Not seen.Exists(UCase$(budgetId)) Then
+                    seen.Add UCase$(budgetId), True
+
+                    Set d = CreateObject("Scripting.Dictionary")
+                    d("budgetId") = budgetId
+                    d("name") = budgetName
+                    d("fiscalYear") = SummaryYear(ThisWorkbook.Worksheets(SH_SUMMARY))
+                    d("fundId") = NormalizeId("fund-", fundName)
+                    d("active") = True
+                    d("description") = "Synthesized from Ledger budget category/fund values."
+                    d("lines") = NewJsonArray()
+                    d("extensions") = CreateObject("Scripting.Dictionary")
+                    coll.Add d
+                End If
+            End If
+        End If
+    Next r
+
+    Set ExportBudgets = coll
 End Function
 
 Private Function ExportTransactions() As Collection
@@ -317,10 +394,12 @@ Private Function ExportTransactions() As Collection
     Set ExportTransactions = txs
 End Function
 
+
 Private Function ExportLedgerRowAsTransaction(ws As Worksheet, ByVal r As Long) As Object
     Dim tx As Object
     Dim ext As Object
     Dim wbk As Object
+    Dim budgetId As Variant
 
     Set tx = CreateObject("Scripting.Dictionary")
     tx("transactionId") = "ledger-row-" & CStr(r)
@@ -330,11 +409,21 @@ Private Function ExportLedgerRowAsTransaction(ws As Worksheet, ByVal r As Long) 
     tx("reference") = SafeText(ws.Cells(r, COL_LEDGER_REF).Value)
     tx("status") = "POSTED"
     tx("source") = "MANUAL"
+    tx("bankTiming") = TimingValueFromWorkbook(ws.Cells(r, COL_LEDGER_AFFECTS_BANK).Value)
+    tx("budgetTiming") = TimingValueFromWorkbook(ws.Cells(r, COL_LEDGER_AFFECTS_BUDGET).Value)
+
+    budgetId = BudgetIdFromFields(SafeText(ws.Cells(r, COL_LEDGER_BUDGET_CATEGORY).Value), _
+                                  SafeText(ws.Cells(r, COL_LEDGER_FUND).Value))
+    If Not IsNull(budgetId) Then tx("budgetId") = budgetId
+
+    tx("workbookLink") = WorkbookLinkObject(SH_LEDGER, r)
 
     Set ext = CreateObject("Scripting.Dictionary")
     Set wbk = CreateObject("Scripting.Dictionary")
 
+    wbk("sheet") = SH_LEDGER
     wbk("ledgerRow") = r
+    wbk("visibleRowNumber") = SafeOrNull(ws.Cells(r, COL_LEDGER_ROWNUM).Value)
     wbk("dateShowsOnStatement") = ISODateOrNull(ws.Cells(r, COL_LEDGER_DATE_SHOWS).Value)
     wbk("incomingCheckOrTransferDate") = ISODateOrNull(ws.Cells(r, COL_LEDGER_INCOMING).Value)
     wbk("personOrBusinessName") = SafeText(ws.Cells(r, COL_LEDGER_NAME).Value)
@@ -368,6 +457,7 @@ Private Function ExportLedgerSplitLines(ws As Worksheet, ByVal r As Long) As Col
     Set ExportLedgerSplitLines = lines
 End Function
 
+
 Private Function ExportOneSplit(ws As Worksheet, ByVal r As Long, grp As Variant, ByVal splitIndex As Long) As Object
     Dim d As Object
     Dim ext As Object
@@ -376,60 +466,68 @@ Private Function ExportOneSplit(ws As Worksheet, ByVal r As Long, grp As Variant
     Dim incomeCat As String
     Dim expenseCat As String
     Dim acct As String
+    Dim fundName As String
+    Dim budgetId As Variant
 
-    amt = CDbl(ValZero(ws.Cells(r, grp(0)).Value))
-    incomeCat = SafeText(ws.Cells(r, grp(1)).Value)
-    expenseCat = SafeText(ws.Cells(r, grp(2)).Value)
+    amt = CDbl(ValZero(ws.Cells(r, grp(1)).Value))
+    incomeCat = SafeText(ws.Cells(r, grp(2)).Value)
+    expenseCat = SafeText(ws.Cells(r, grp(3)).Value)
+    fundName = SafeText(ws.Cells(r, COL_LEDGER_FUND).Value)
 
     Set d = CreateObject("Scripting.Dictionary")
     d("lineId") = "ledger-row-" & r & "-ln-" & splitIndex
 
     If Len(expenseCat) > 0 Then
         acct = expenseCat
+        d("debit") = FormatAmount(Abs(amt))
+        d("credit") = FormatAmount(0)
     Else
         acct = incomeCat
+        d("debit") = FormatAmount(0)
+        d("credit") = FormatAmount(Abs(amt))
     End If
     If Len(acct) = 0 Then acct = "UNMAPPED"
 
     d("accountId") = acct
 
-    If Len(expenseCat) > 0 Then
-        d("debit") = FormatAmount(Abs(amt))
-        d("credit") = FormatAmount(0)
-    Else
-        d("debit") = FormatAmount(0)
-        d("credit") = FormatAmount(Abs(amt))
-    End If
-
-    If Len(SafeText(ws.Cells(r, COL_LEDGER_FUND).Value)) > 0 Then
-        d("fundId") = NormalizeId("fund-", SafeText(ws.Cells(r, COL_LEDGER_FUND).Value))
+    If Len(fundName) > 0 Then
+        d("fundId") = NormalizeId("fund-", fundName)
     Else
         d("fundId") = Null
     End If
 
-    d("budgetId") = SafeOrNull(ws.Cells(r, COL_LEDGER_BUDGET_CATEGORY).Value)
+    budgetId = BudgetIdFromFields(SafeText(ws.Cells(r, COL_LEDGER_BUDGET_CATEGORY).Value), fundName)
+    If Not IsNull(budgetId) Then
+        d("budgetId") = budgetId
+    Else
+        d("budgetId") = Null
+    End If
+
     d("personId") = SafeOrNull(ws.Cells(r, COL_LEDGER_NAME).Value)
     d("eventId") = Null
     d("documentId") = Null
     d("memo") = SafeText(ws.Cells(r, COL_LEDGER_DETAILS).Value)
+    d("usedFor") = SafeOrNull(ws.Cells(r, grp(4)).Value)
+    d("itemNumber") = SafeOrNull(ws.Cells(r, grp(5)).Value)
+    d("quantity") = NullOrNumber(ws.Cells(r, grp(6)).Value)
+    d("workbookLink") = WorkbookLinkObject(SH_LEDGER, r)
 
     Set ext = CreateObject("Scripting.Dictionary")
     Set wbk = CreateObject("Scripting.Dictionary")
-
     wbk("splitIndex") = splitIndex
+    wbk("splitRowNumber") = SafeOrNull(ws.Cells(r, grp(0)).Value)
     wbk("amount") = FormatAmount(Abs(amt))
     wbk("incomeCategory") = NullIfEmpty(incomeCat)
     wbk("expenseCategory") = NullIfEmpty(expenseCat)
-    wbk("usedFor") = SafeOrNull(ws.Cells(r, grp(3)).Value)
-    wbk("itemNumber") = SafeOrNull(ws.Cells(r, grp(4)).Value)
-    wbk("quantity") = SafeOrNull(ws.Cells(r, grp(5)).Value)
-    wbk("reserved") = SafeOrNull(ws.Cells(r, grp(6)).Value)
-
+    wbk("usedFor") = SafeOrNull(ws.Cells(r, grp(4)).Value)
+    wbk("itemNumber") = SafeOrNull(ws.Cells(r, grp(5)).Value)
+    wbk("quantity") = NullOrNumber(ws.Cells(r, grp(6)).Value)
     ext("workbook") = wbk
     d("extensions") = ext
 
     Set ExportOneSplit = d
 End Function
+
 
 Private Function ExportOutstandingItems() As Collection
     Dim ws As Worksheet
@@ -442,20 +540,22 @@ Private Function ExportOutstandingItems() As Collection
     Dim ext As Object
     Dim wbk As Object
 
-    lastRow = FindLastUsedByAnyValue(ws, Array(COL_OUT_DATE_SENT, COL_OUT_NAME, COL_OUT_AMOUNT))
+    lastRow = FindLastInterestingOutstandingRow(ws)
 
     For r = ROW_OUT_FIRST To lastRow
-        If RowHasAnyValue(ws, r, Array(COL_OUT_DATE_SENT, COL_OUT_NAME, COL_OUT_AMOUNT, COL_OUT_TRANSFER_OR_CHECK)) Then
+        If IsOutstandingRowUsed(ws, r) Then
             Set d = CreateObject("Scripting.Dictionary")
             d("outstandingItemId") = "outstanding-row-" & r
             d("kind") = GuessOutstandingKind(ws, r)
             d("ledgerLink") = Null
+            d("workbookLink") = WorkbookLinkObject(SH_OUTSTANDING, r)
             d("amount") = FormatAmountAbs(ws.Cells(r, COL_OUT_AMOUNT).Value)
 
             Set ext = CreateObject("Scripting.Dictionary")
             Set wbk = CreateObject("Scripting.Dictionary")
             wbk("sheet") = SH_OUTSTANDING
             wbk("row") = r
+            wbk("visibleRowNumber") = SafeOrNull(ws.Cells(r, COL_OUT_OSROW).Value)
             ext("workbook") = wbk
             d("extensions") = ext
 
@@ -477,6 +577,7 @@ Private Function ExportOutstandingItems() As Collection
     Set ExportOutstandingItems = coll
 End Function
 
+
 Private Function ExportAssets() As Collection
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Worksheets(SH_ASSETS)
@@ -486,13 +587,12 @@ Private Function ExportAssets() As Collection
     Dim r As Long
     Dim d As Object
 
-    lastRow = FindLastUsedByAnyValue(ws, Array(COL_ASSET_DATE_ACQ, COL_ASSET_DESC, COL_ASSET_GUARDIAN_NAME))
+    lastRow = FindLastInterestingAssetRow(ws)
 
     For r = ROW_ASSET_FIRST To lastRow
-        If RowHasAnyValue(ws, r, Array(COL_ASSET_DATE_ACQ, COL_ASSET_DESC, COL_ASSET_ITEM_TYPE, COL_ASSET_GUARDIAN_NAME)) Then
+        If IsAssetRowUsed(ws, r) Then
             Set d = CreateObject("Scripting.Dictionary")
             d("assetId") = "asset-row-" & r
-            d("itemNumber") = SafeOrNull(ws.Cells(r, COL_ASSET_ITEMNUM).Value)
             d("dateAcquired") = ISODateOrNull(ws.Cells(r, COL_ASSET_DATE_ACQ).Value)
             d("description") = SafeOrNull(ws.Cells(r, COL_ASSET_DESC).Value)
             d("itemCount") = NullOrNumber(ws.Cells(r, COL_ASSET_ITEM_COUNT).Value)
@@ -513,6 +613,7 @@ Private Function ExportAssets() As Collection
     Set ExportAssets = coll
 End Function
 
+
 Private Function ExportSupplies() As Collection
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Worksheets(SH_SUPPLIES)
@@ -523,10 +624,10 @@ Private Function ExportSupplies() As Collection
     Dim d As Object
     Dim gd As Object
 
-    lastRow = FindLastUsedByAnyValue(ws, Array(COL_SUP_DATE_ACQ, COL_SUP_DESC, COL_SUP_GUARDIAN_NAME))
+    lastRow = FindLastInterestingSupplyRow(ws)
 
     For r = ROW_SUPPLY_FIRST To lastRow
-        If RowHasAnyValue(ws, r, Array(COL_SUP_DATE_ACQ, COL_SUP_DESC, COL_SUP_GUARDIAN_NAME, COL_SUP_REASON)) Then
+        If IsSupplyRowUsed(ws, r) Then
             Set d = CreateObject("Scripting.Dictionary")
             d("supplyId") = "supply-row-" & r
             d("itemNumber") = SafeOrNull(ws.Cells(r, COL_SUP_ITEMNUM).Value)
@@ -554,10 +655,6 @@ Private Function ExportSupplies() As Collection
     Set ExportSupplies = coll
 End Function
 
-'========================
-' Import helpers
-'========================
-
 Private Sub ImportTransactions(txs As Variant)
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Worksheets(SH_LEDGER)
@@ -571,13 +668,16 @@ Private Sub ImportTransactions(txs As Variant)
     Next tx
 End Sub
 
+
 Private Sub WriteTransactionToLedgerRow(ws As Worksheet, ByVal r As Long, tx As Variant)
     Dim wbk As Object
-    Set wbk = Nothing
+    Dim lines As Object
+    Dim line As Variant
+    Dim firstFundName As String
+    Dim txBudgetName As String
 
-    If HasWorkbookExtension(tx) Then
-        Set wbk = tx("extensions")("workbook")
-    End If
+    Set wbk = Nothing
+    If HasWorkbookExtension(tx) Then Set wbk = tx("extensions")("workbook")
 
     ws.Cells(r, COL_LEDGER_TXN_DATE).Value = ParseIsoDate(ValueOrFallback(tx, "transactionDate", Null))
     ws.Cells(r, COL_LEDGER_REF).Value = ValueOrFallback(tx, "reference", "")
@@ -593,14 +693,23 @@ Private Sub WriteTransactionToLedgerRow(ws As Worksheet, ByVal r As Long, tx As 
         ws.Cells(r, COL_LEDGER_AFFECTS_BUDGET).Value = ValueOrFallback(wbk, "affectsBudget", "")
         ws.Cells(r, COL_LEDGER_FUND).Value = ValueOrFallback(wbk, "fund", "")
         ws.Cells(r, COL_LEDGER_MERCHANT).Value = ValueOrFallback(wbk, "merchant", "")
-    End If
+    Else
+        ws.Cells(r, COL_LEDGER_AFFECTS_BANK).Value = DenormTimingValue(ValueOrFallback(tx, "bankTiming", "NONE"))
+        ws.Cells(r, COL_LEDGER_AFFECTS_BUDGET).Value = DenormTimingValue(ValueOrFallback(tx, "budgetTiming", "NONE"))
 
-    Dim lines As Object
-    Dim i As Long
-    Dim line As Variant
+        txBudgetName = LookupBudgetName(ValueOrFallback(tx, "budgetId", ""))
+        If Len(txBudgetName) > 0 Then ws.Cells(r, COL_LEDGER_BUDGET_CATEGORY).Value = txBudgetName
+
+        If ExistsInDict(tx, "lines") Then
+            Set lines = tx("lines")
+            firstFundName = FirstFundNameFromLines(lines)
+            If Len(firstFundName) > 0 Then ws.Cells(r, COL_LEDGER_FUND).Value = firstFundName
+        End If
+    End If
 
     If ExistsInDict(tx, "lines") Then
         Set lines = tx("lines")
+        Dim i As Long
         i = 0
         For Each line In lines
             If i > UBound(ledgerSplitCols) Then Exit For
@@ -610,42 +719,49 @@ Private Sub WriteTransactionToLedgerRow(ws As Worksheet, ByVal r As Long, tx As 
     End If
 End Sub
 
+
 Private Sub WriteOneSplit(ws As Worksheet, ByVal r As Long, grp As Variant, line As Variant)
     Dim wbk As Object
     Dim incomeCat As String
     Dim expenseCat As String
     Dim amt As Double
+    Dim usedFor As Variant
+    Dim itemNumber As Variant
+    Dim qty As Variant
 
     Set wbk = Nothing
-
-    If HasWorkbookExtension(line) Then
-        Set wbk = line("extensions")("workbook")
-    End If
+    If HasWorkbookExtension(line) Then Set wbk = line("extensions")("workbook")
 
     If Not wbk Is Nothing Then
         incomeCat = SafeText(ValueOrFallback(wbk, "incomeCategory", ""))
         expenseCat = SafeText(ValueOrFallback(wbk, "expenseCategory", ""))
-        amt = CDbl(Val(Replace(SafeText(ValueOrFallback(wbk, "amount", "0.00")), ",", "")))
-        ws.Cells(r, grp(3)).Value = ValueOrFallback(wbk, "usedFor", "")
-        ws.Cells(r, grp(4)).Value = ValueOrFallback(wbk, "itemNumber", "")
-        ws.Cells(r, grp(5)).Value = ValueOrFallback(wbk, "quantity", "")
-        ws.Cells(r, grp(6)).Value = ValueOrFallback(wbk, "reserved", "")
+        amt = ParseJsonNumber(ValueOrFallback(wbk, "amount", "0.00"))
+        usedFor = ValueOrFallback(wbk, "usedFor", ValueOrFallback(line, "usedFor", ""))
+        itemNumber = ValueOrFallback(wbk, "itemNumber", ValueOrFallback(line, "itemNumber", ""))
+        qty = ValueOrFallback(wbk, "quantity", ValueOrFallback(line, "quantity", ""))
     Else
-        If CDbl(Val(Replace(SafeText(ValueOrFallback(line, "debit", "0")), ",", ""))) > 0 Then
+        If ParseJsonNumber(ValueOrFallback(line, "debit", "0")) > 0 Then
             expenseCat = SafeText(ValueOrFallback(line, "accountId", ""))
             incomeCat = ""
-            amt = CDbl(Val(SafeText(ValueOrFallback(line, "debit", "0"))))
+            amt = ParseJsonNumber(ValueOrFallback(line, "debit", "0"))
         Else
             incomeCat = SafeText(ValueOrFallback(line, "accountId", ""))
             expenseCat = ""
-            amt = CDbl(Val(SafeText(ValueOrFallback(line, "credit", "0"))))
+            amt = ParseJsonNumber(ValueOrFallback(line, "credit", "0"))
         End If
+        usedFor = ValueOrFallback(line, "usedFor", "")
+        itemNumber = ValueOrFallback(line, "itemNumber", "")
+        qty = ValueOrFallback(line, "quantity", "")
     End If
 
-    ws.Cells(r, grp(0)).Value = amt
-    ws.Cells(r, grp(1)).Value = incomeCat
-    ws.Cells(r, grp(2)).Value = expenseCat
+    ws.Cells(r, grp(1)).Value = amt
+    ws.Cells(r, grp(2)).Value = incomeCat
+    ws.Cells(r, grp(3)).Value = expenseCat
+    ws.Cells(r, grp(4)).Value = usedFor
+    ws.Cells(r, grp(5)).Value = itemNumber
+    ws.Cells(r, grp(6)).Value = qty
 End Sub
+
 
 Private Sub ImportOutstandingItems(items As Variant)
     Dim ws As Worksheet
@@ -655,7 +771,7 @@ Private Sub ImportOutstandingItems(items As Variant)
     Dim r As Long
 
     For Each item In items
-        r = NextAppendRow(ws, ROW_OUT_FIRST, Array(COL_OUT_DATE_SENT, COL_OUT_NAME, COL_OUT_AMOUNT))
+        r = NextOutstandingAppendRow(ws)
         ws.Cells(r, COL_OUT_DATE_SENT).Value = ParseIsoDate(ValueOrFallback(item, "dateSentOrReceived", Null))
         ws.Cells(r, COL_OUT_INCOMING_DATE).Value = ParseIsoDate(ValueOrFallback(item, "incomingCheckOrTransferDate", Null))
         ws.Cells(r, COL_OUT_TRANSFER_OR_CHECK).Value = ValueOrFallback(item, "transferIdOrCheckNumber", "")
@@ -664,11 +780,12 @@ Private Sub ImportOutstandingItems(items As Variant)
         ws.Cells(r, COL_OUT_DETAILS).Value = ValueOrFallback(item, "detailsNotes", "")
         ws.Cells(r, COL_OUT_MERCHANT).Value = ValueOrFallback(item, "fromToCardMerchant", "")
         ws.Cells(r, COL_OUT_ACCOUNT).Value = ValueOrFallback(item, "accountForPaymentOrDeposit", "")
-        ws.Cells(r, COL_OUT_AMOUNT).Value = CDbl(Val(SafeText(ValueOrFallback(item, "amount", "0"))))
+        ws.Cells(r, COL_OUT_AMOUNT).Value = ParseJsonNumber(ValueOrFallback(item, "amount", "0"))
         ws.Cells(r, COL_OUT_DATE_REVERSED).Value = ParseIsoDate(ValueOrFallback(item, "dateReversed", Null))
         ws.Cells(r, COL_OUT_REASON_APPROVAL).Value = ValueOrFallback(item, "reversalReasonAndApproval", "")
     Next item
 End Sub
+
 
 Private Sub ImportAssets(items As Variant)
     Dim ws As Worksheet
@@ -678,7 +795,7 @@ Private Sub ImportAssets(items As Variant)
     Dim r As Long
 
     For Each item In items
-        r = NextAppendRow(ws, ROW_ASSET_FIRST, Array(COL_ASSET_DATE_ACQ, COL_ASSET_DESC, COL_ASSET_GUARDIAN_NAME))
+        r = NextAssetAppendRow(ws)
         ws.Cells(r, COL_ASSET_ITEMNUM).Value = ValueOrFallback(item, "itemNumber", "")
         ws.Cells(r, COL_ASSET_DATE_ACQ).Value = ParseIsoDate(ValueOrFallback(item, "dateAcquired", Null))
         ws.Cells(r, COL_ASSET_DESC).Value = ValueOrFallback(item, "description", "")
@@ -711,6 +828,7 @@ Private Sub ImportAssets(items As Variant)
     Next item
 End Sub
 
+
 Private Sub ImportSupplies(items As Variant)
     Dim ws As Worksheet
     Set ws = ThisWorkbook.Worksheets(SH_SUPPLIES)
@@ -719,7 +837,7 @@ Private Sub ImportSupplies(items As Variant)
     Dim r As Long
 
     For Each item In items
-        r = NextAppendRow(ws, ROW_SUPPLY_FIRST, Array(COL_SUP_DATE_ACQ, COL_SUP_DESC, COL_SUP_GUARDIAN_NAME))
+        r = NextSupplyAppendRow(ws)
         ws.Cells(r, COL_SUP_ITEMNUM).Value = ValueOrFallback(item, "itemNumber", "")
         ws.Cells(r, COL_SUP_DATE_ACQ).Value = ParseIsoDate(ValueOrFallback(item, "dateAcquired", Null))
         ws.Cells(r, COL_SUP_DESC).Value = ValueOrFallback(item, "description", "")
@@ -750,9 +868,6 @@ Private Sub ImportSupplies(items As Variant)
     Next item
 End Sub
 
-'========================
-' Utility helpers
-'========================
 
 Private Sub InitSplitCols()
     ledgerSplitCols = Array( _
@@ -767,23 +882,60 @@ Private Function NewJsonArray() As Collection
     Set NewJsonArray = New Collection
 End Function
 
+
 Private Function FindLastInterestingLedgerRow(ws As Worksheet) As Long
     Dim maxR As Long
-    maxR = ws.Cells(ws.Rows.Count, COL_LEDGER_TXN_DATE).End(xlUp).Row
-    If ws.Cells(ws.Rows.Count, "AG").End(xlUp).Row > maxR Then maxR = ws.Cells(ws.Rows.Count, "AG").End(xlUp).Row
-    If ws.Cells(ws.Rows.Count, "BG").End(xlUp).Row > maxR Then maxR = ws.Cells(ws.Rows.Count, "BG").End(xlUp).Row
-    If ws.Cells(ws.Rows.Count, "CG").End(xlUp).Row > maxR Then maxR = ws.Cells(ws.Rows.Count, "CG").End(xlUp).Row
-    If ws.Cells(ws.Rows.Count, "DG").End(xlUp).Row > maxR Then maxR = ws.Cells(ws.Rows.Count, "DG").End(xlUp).Row
-    If maxR < ROW_LEDGER_FIRST Then maxR = ROW_LEDGER_FIRST
+    maxR = ROW_LEDGER_FIRST
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_LEDGER_TXN_DATE).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_LEDGER_DATE_SHOWS).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_LEDGER_REF).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_LEDGER_INCOMING).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_LEDGER_NAME).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_LEDGER_DETAILS).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "AH").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "AI").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "AJ").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "BH").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "BI").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "BJ").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "CH").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "CI").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "CJ").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "DH").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "DI").End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, "DJ").End(xlUp).Row)
     FindLastInterestingLedgerRow = maxR
 End Function
 
+
 Private Function IsLedgerRowUsed(ws As Worksheet, ByVal r As Long) As Boolean
-    IsLedgerRowUsed = RowHasAnyValue(ws, r, Array(COL_LEDGER_TXN_DATE, COL_LEDGER_REF, COL_LEDGER_NAME, COL_LEDGER_DETAILS, "AG", "BG", "CG", "DG"))
+    If RowHasAnyValue(ws, r, Array(COL_LEDGER_TXN_DATE, COL_LEDGER_DATE_SHOWS, COL_LEDGER_REF, COL_LEDGER_INCOMING, COL_LEDGER_NAME, COL_LEDGER_DETAILS)) Then
+        IsLedgerRowUsed = True
+        Exit Function
+    End If
+
+    If HasSplitData(ws, r, ledgerSplitCols(0)) _
+       Or HasSplitData(ws, r, ledgerSplitCols(1)) _
+       Or HasSplitData(ws, r, ledgerSplitCols(2)) _
+       Or HasSplitData(ws, r, ledgerSplitCols(3)) Then
+        IsLedgerRowUsed = True
+        Exit Function
+    End If
+
+    IsLedgerRowUsed = False
 End Function
 
+
 Private Function HasSplitData(ws As Worksheet, ByVal r As Long, grp As Variant) As Boolean
-    HasSplitData = RowHasAnyValue(ws, r, Array(grp(0), grp(1), grp(2), grp(3), grp(4), grp(5), grp(6)))
+    If Abs(ValZero(ws.Cells(r, grp(1)).Value)) > 0 Then
+        HasSplitData = True
+    ElseIf Len(SafeText(ws.Cells(r, grp(2)).Value)) > 0 Then
+        HasSplitData = True
+    ElseIf Len(SafeText(ws.Cells(r, grp(3)).Value)) > 0 Then
+        HasSplitData = True
+    Else
+        HasSplitData = False
+    End If
 End Function
 
 Private Function FindLastUsedByAnyValue(ws As Worksheet, cols As Variant) As Long
@@ -811,8 +963,21 @@ Private Function RowHasAnyValue(ws As Worksheet, ByVal r As Long, cols As Varian
     RowHasAnyValue = False
 End Function
 
+
 Private Function NextLedgerAppendRow(ws As Worksheet) As Long
-    NextLedgerAppendRow = NextAppendRow(ws, ROW_LEDGER_FIRST, Array(COL_LEDGER_TXN_DATE, COL_LEDGER_REF, COL_LEDGER_NAME, COL_LEDGER_DETAILS, "AG", "BG", "CG", "DG"))
+    Dim r As Long
+    Dim lastRow As Long
+
+    lastRow = FindLastInterestingLedgerRow(ws)
+
+    For r = ROW_LEDGER_FIRST To lastRow
+        If Not IsLedgerRowUsed(ws, r) Then
+            NextLedgerAppendRow = r
+            Exit Function
+        End If
+    Next r
+
+    NextLedgerAppendRow = lastRow + 1
 End Function
 
 Private Function NextAppendRow(ws As Worksheet, ByVal firstRow As Long, cols As Variant) As Long
@@ -831,6 +996,7 @@ Private Function NextAppendRow(ws As Worksheet, ByVal firstRow As Long, cols As 
     NextAppendRow = lastRow + 1
 End Function
 
+
 Private Sub AddSimpleAccount(coll As Collection, seen As Object, ByVal nameOrId As String)
     If Len(Trim$(nameOrId)) = 0 Then Exit Sub
 
@@ -841,13 +1007,14 @@ Private Sub AddSimpleAccount(coll As Collection, seen As Object, ByVal nameOrId 
 
     Dim d As Object
     Set d = CreateObject("Scripting.Dictionary")
-    d("number") = nameOrId
-    d("name") = nameOrId
-    d("type") = GuessAccountType(nameOrId)
-    d("parent") = Null
-    d("increaseSide") = GuessIncreaseSide(d("type"))
-    d("openingBalance") = "0.00"
-    d("supplementalKinds") = NewJsonArray()
+    d("Number") = nameOrId
+    d("Name") = nameOrId
+    d("Type") = GuessAccountType(nameOrId)
+    d("Parent") = Null
+    d("IncreaseSide") = GuessIncreaseSide(d("Type"))
+    d("OpeningBalance") = "0.00"
+    d("SupplementalKinds") = NewJsonArray()
+    d("accountId") = nameOrId
     coll.Add d
 End Sub
 
@@ -875,14 +1042,17 @@ Private Function GuessIncreaseSide(ByVal acctType As String) As String
     End Select
 End Function
 
+
 Private Function GuessOutstandingKind(ws As Worksheet, ByVal r As Long) As String
     Dim ref As String
     Dim amt As Double
 
-    ref = SafeText(ws.Cells(r, COL_OUT_TRANSFER_OR_CHECK).Value)
+    ref = UCase$(SafeText(ws.Cells(r, COL_OUT_TRANSFER_OR_CHECK).Value))
     amt = CDbl(ValZero(ws.Cells(r, COL_OUT_AMOUNT).Value))
 
-    If Len(ref) > 0 Then
+    If InStr(ref, "TR") > 0 Or InStr(ref, "XFER") > 0 Or InStr(ref, "TRANSFER") > 0 Then
+        GuessOutstandingKind = "TRANSFER"
+    ElseIf Len(ref) > 0 Then
         GuessOutstandingKind = "CHECK"
     ElseIf amt >= 0 Then
         GuessOutstandingKind = "DEPOSIT"
@@ -900,6 +1070,7 @@ Private Function GuessOutstandingStatus(ws As Worksheet, ByVal r As Long) As Str
         GuessOutstandingStatus = "OUTSTANDING"
     End If
 End Function
+
 
 Private Function WorkbookRowExtension(ByVal sheetName As String, ByVal rowNum As Long) As Object
     Dim ext As Object
@@ -1003,6 +1174,10 @@ Private Function ValZero(v As Variant) As Double
     ValZero = CDbl(Val(Replace(SafeText(v), ",", "")))
 End Function
 
+Private Function ParseJsonNumber(ByVal v As Variant) As Double
+    ParseJsonNumber = CDbl(Val(Replace(SafeText(v), ",", "")))
+End Function
+
 Private Function NullOrNumber(v As Variant) As Variant
     If Len(SafeText(v)) = 0 Then
         NullOrNumber = Null
@@ -1054,17 +1229,33 @@ Private Function ISODateOrNull(v As Variant) As Variant
     End If
 End Function
 
+
 Private Function ParseIsoDate(v As Variant) As Variant
     Dim s As String
+    Dim y As Integer
+    Dim m As Integer
+    Dim d As Integer
+
     s = SafeText(v)
 
     If Len(s) = 0 Then
-        ParseIsoDate = ""
-    ElseIf IsDate(Left$(s, 10)) Then
-        ParseIsoDate = DateValue(Left$(s, 10))
-    Else
-        ParseIsoDate = ""
+        ParseIsoDate = vbNullString
+        Exit Function
     End If
+
+    s = Left$(s, 10)
+
+    If Len(s) = 10 And Mid$(s, 5, 1) = "-" And Mid$(s, 8, 1) = "-" Then
+        On Error GoTo BadDate
+        y = CInt(Left$(s, 4))
+        m = CInt(Mid$(s, 6, 2))
+        d = CInt(Right$(s, 2))
+        ParseIsoDate = DateSerial(y, m, d)
+        Exit Function
+    End If
+
+BadDate:
+    ParseIsoDate = vbNullString
 End Function
 
 Private Function NormalizeId(ByVal prefix As String, ByVal raw As String) As String
@@ -1103,32 +1294,322 @@ Private Function NormalizeId(ByVal prefix As String, ByVal raw As String) As Str
     NormalizeId = prefix & body
 End Function
 
+
 Private Function YearStartFromSummary(ws As Worksheet) As String
-    Dim yr As Long
-    yr = CLng(ValZero(ws.Range("H6").Value))
-    If yr = 0 Then yr = Year(Date)
-    YearStartFromSummary = Format$(DateSerial(yr, 1, 1), "yyyy-mm-dd")
+    YearStartFromSummary = Format$(DateSerial(SummaryYear(ws), 1, 1), "yyyy-mm-dd")
 End Function
 
+
 Private Function YearEndFromSummary(ws As Worksheet) As String
+    If IsDate(ws.Range(CELL_SUM_FY_END).Value) Then
+        YearEndFromSummary = Format$(CDate(ws.Range(CELL_SUM_FY_END).Value), "yyyy-mm-dd")
+    Else
+        YearEndFromSummary = Format$(DateSerial(SummaryYear(ws), 12, 31), "yyyy-mm-dd")
+    End If
+End Function
+
+
+Private Function SummaryYear(ws As Worksheet) As Long
     Dim yr As Long
-    yr = CLng(ValZero(ws.Range("H6").Value))
+    yr = CLng(ValZero(ws.Range(CELL_SUM_LEDGER_YEAR).Value))
     If yr = 0 Then yr = Year(Date)
-    YearEndFromSummary = Format$(DateSerial(yr, 12, 31), "yyyy-mm-dd")
+    SummaryYear = yr
+End Function
+
+Private Function DateCellOrFallback(v As Variant, ByVal fallbackIso As String) As String
+    If IsDate(v) Then
+        DateCellOrFallback = Format$(CDate(v), "yyyy-mm-dd")
+    Else
+        DateCellOrFallback = fallbackIso
+    End If
+End Function
+
+Private Function FormatDateTimeOffset(ByVal dt As Date) As String
+    FormatDateTimeOffset = Format$(dt, "yyyy-mm-dd\Thh:nn:ss") & "Z"
+End Function
+
+Private Function WorkbookLinkObject(ByVal sheetKey As String, ByVal rowNum As Long) As Object
+    Dim d As Object
+    Set d = CreateObject("Scripting.Dictionary")
+    d("sheetKey") = sheetKey
+    d("ledgerRowIndex") = rowNum
+    Set WorkbookLinkObject = d
+End Function
+
+Private Function TimingValueFromWorkbook(v As Variant) As String
+    Dim s As String
+    s = UCase$(SafeText(v))
+
+    Select Case s
+        Case "NOW"
+            TimingValueFromWorkbook = "NOW"
+        Case "PREVIOUSLY", "PREVIOUS"
+            TimingValueFromWorkbook = "PREVIOUSLY"
+        Case "LATER"
+            TimingValueFromWorkbook = "LATER"
+        Case Else
+            TimingValueFromWorkbook = "NONE"
+    End Select
+End Function
+
+Private Function DenormTimingValue(v As Variant) As String
+    Select Case UCase$(SafeText(v))
+        Case "NOW"
+            DenormTimingValue = "Now"
+        Case "PREVIOUSLY"
+            DenormTimingValue = "Previously"
+        Case "LATER"
+            DenormTimingValue = "Later"
+        Case Else
+            DenormTimingValue = ""
+    End Select
+End Function
+
+Private Function BudgetIdFromFields(ByVal budgetName As String, ByVal fundName As String) As Variant
+    If Len(Trim$(budgetName)) = 0 Then
+        BudgetIdFromFields = Null
+    ElseIf Len(Trim$(fundName)) = 0 Then
+        BudgetIdFromFields = NormalizeId("budget-", budgetName)
+    Else
+        BudgetIdFromFields = NormalizeId("budget-", fundName & "-" & budgetName)
+    End If
+End Function
+
+Private Function MaxLong(ByVal a As Long, ByVal b As Long) As Long
+    If a > b Then
+        MaxLong = a
+    Else
+        MaxLong = b
+    End If
+End Function
+
+Private Function FindLastInterestingOutstandingRow(ws As Worksheet) As Long
+    Dim maxR As Long
+    maxR = ROW_OUT_FIRST
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_DATE_SENT).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_INCOMING_DATE).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_TRANSFER_OR_CHECK).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_DATE_SHOWS).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_NAME).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_DETAILS).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_AMOUNT).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_DATE_REVERSED).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_OUT_REASON_APPROVAL).End(xlUp).Row)
+    FindLastInterestingOutstandingRow = maxR
+End Function
+
+Private Function IsOutstandingRowUsed(ws As Worksheet, ByVal r As Long) As Boolean
+    If Abs(ValZero(ws.Cells(r, COL_OUT_AMOUNT).Value)) > 0 Then
+        IsOutstandingRowUsed = True
+    Else
+        IsOutstandingRowUsed = RowHasAnyValue(ws, r, Array(COL_OUT_DATE_SENT, COL_OUT_INCOMING_DATE, COL_OUT_TRANSFER_OR_CHECK, COL_OUT_DATE_SHOWS, COL_OUT_NAME, COL_OUT_DETAILS, COL_OUT_DATE_REVERSED, COL_OUT_REASON_APPROVAL))
+    End If
+End Function
+
+Private Function NextOutstandingAppendRow(ws As Worksheet) As Long
+    Dim r As Long
+    Dim lastRow As Long
+    lastRow = FindLastInterestingOutstandingRow(ws)
+
+    For r = ROW_OUT_FIRST To lastRow
+        If Not IsOutstandingRowUsed(ws, r) Then
+            NextOutstandingAppendRow = r
+            Exit Function
+        End If
+    Next r
+
+    NextOutstandingAppendRow = lastRow + 1
+End Function
+
+Private Function FindLastInterestingAssetRow(ws As Worksheet) As Long
+    Dim maxR As Long
+    maxR = ROW_ASSET_FIRST
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_DATE_ACQ).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_DESC).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_ITEM_COUNT).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_TOTAL_VALUE).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_TOTAL_LOT_COUNT).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_TOTAL_PAID).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_PER_ITEM).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_GUARDIAN_NAME).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_GUARDIAN_EMAIL).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_GUARDIAN_PHONE).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_DATE_AS_OF).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_NOTES).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_APPROVED_BY).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_DATE_REMOVED).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_ASSET_NUM_REMOVED).End(xlUp).Row)
+    FindLastInterestingAssetRow = maxR
+End Function
+
+Private Function IsAssetRowUsed(ws As Worksheet, ByVal r As Long) As Boolean
+    If RowHasAnyValue(ws, r, Array(COL_ASSET_DATE_ACQ, COL_ASSET_DESC, COL_ASSET_GUARDIAN_NAME, COL_ASSET_GUARDIAN_EMAIL, COL_ASSET_GUARDIAN_PHONE, COL_ASSET_DATE_AS_OF, COL_ASSET_NOTES, COL_ASSET_APPROVED_BY, COL_ASSET_DATE_REMOVED, COL_ASSET_NUM_REMOVED)) Then
+        IsAssetRowUsed = True
+    ElseIf Abs(ValZero(ws.Cells(r, COL_ASSET_ITEM_COUNT).Value)) > 0 _
+        Or Abs(ValZero(ws.Cells(r, COL_ASSET_TOTAL_VALUE).Value)) > 0 _
+        Or Abs(ValZero(ws.Cells(r, COL_ASSET_TOTAL_LOT_COUNT).Value)) > 0 _
+        Or Abs(ValZero(ws.Cells(r, COL_ASSET_TOTAL_PAID).Value)) > 0 _
+        Or Abs(ValZero(ws.Cells(r, COL_ASSET_PER_ITEM).Value)) > 0 Then
+        IsAssetRowUsed = True
+    Else
+        IsAssetRowUsed = False
+    End If
+End Function
+
+Private Function NextAssetAppendRow(ws As Worksheet) As Long
+    Dim r As Long
+    Dim lastRow As Long
+    lastRow = FindLastInterestingAssetRow(ws)
+
+    For r = ROW_ASSET_FIRST To lastRow
+        If Not IsAssetRowUsed(ws, r) Then
+            NextAssetAppendRow = r
+            Exit Function
+        End If
+    Next r
+
+    NextAssetAppendRow = lastRow + 1
+End Function
+
+Private Function FindLastInterestingSupplyRow(ws As Worksheet) As Long
+    Dim maxR As Long
+    maxR = ROW_SUPPLY_FIRST
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_DATE_ACQ).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_DESC).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_COUNT).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_TOTAL_VALUE).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_PER_ITEM).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_GUARDIAN_NAME).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_GUARDIAN_EMAIL).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_GUARDIAN_PHONE).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_DATE_AS_OF).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_LAST_CONFIRMED).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_NOTES).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_APPROVED_BY).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_NUMBER_REMOVED).End(xlUp).Row)
+    maxR = MaxLong(maxR, ws.Cells(ws.Rows.Count, COL_SUP_ADDITIONAL_NOTES).End(xlUp).Row)
+    FindLastInterestingSupplyRow = maxR
+End Function
+
+Private Function IsSupplyRowUsed(ws As Worksheet, ByVal r As Long) As Boolean
+    If RowHasAnyValue(ws, r, Array(COL_SUP_DATE_ACQ, COL_SUP_DESC, COL_SUP_GUARDIAN_NAME, COL_SUP_GUARDIAN_EMAIL, COL_SUP_GUARDIAN_PHONE, COL_SUP_DATE_AS_OF, COL_SUP_LAST_CONFIRMED, COL_SUP_NOTES, COL_SUP_APPROVED_BY, COL_SUP_NUMBER_REMOVED, COL_SUP_ADDITIONAL_NOTES)) Then
+        IsSupplyRowUsed = True
+    ElseIf Abs(ValZero(ws.Cells(r, COL_SUP_COUNT).Value)) > 0 _
+        Or Abs(ValZero(ws.Cells(r, COL_SUP_TOTAL_VALUE).Value)) > 0 _
+        Or Abs(ValZero(ws.Cells(r, COL_SUP_PER_ITEM).Value)) > 0 Then
+        IsSupplyRowUsed = True
+    Else
+        IsSupplyRowUsed = False
+    End If
+End Function
+
+Private Function NextSupplyAppendRow(ws As Worksheet) As Long
+    Dim r As Long
+    Dim lastRow As Long
+    lastRow = FindLastInterestingSupplyRow(ws)
+
+    For r = ROW_SUPPLY_FIRST To lastRow
+        If Not IsSupplyRowUsed(ws, r) Then
+            NextSupplyAppendRow = r
+            Exit Function
+        End If
+    Next r
+
+    NextSupplyAppendRow = lastRow + 1
+End Function
+
+Private Sub ClearImportLookupMaps()
+    Set mBudgetNameById = CreateObject("Scripting.Dictionary")
+    Set mFundNameById = CreateObject("Scripting.Dictionary")
+End Sub
+
+Private Sub BuildImportLookupMaps(root As Object)
+    Dim item As Variant
+
+    If mBudgetNameById Is Nothing Then Set mBudgetNameById = CreateObject("Scripting.Dictionary")
+    If mFundNameById Is Nothing Then Set mFundNameById = CreateObject("Scripting.Dictionary")
+
+    If ExistsInDict(root, "budgets") Then
+        For Each item In root("budgets")
+            If ExistsInDict(item, "budgetId") And ExistsInDict(item, "name") Then
+                mBudgetNameById(UCase$(CStr(item("budgetId")))) = CStr(item("name"))
+            End If
+        Next item
+    End If
+
+    If ExistsInDict(root, "funds") Then
+        For Each item In root("funds")
+            If ExistsInDict(item, "fundId") And ExistsInDict(item, "name") Then
+                mFundNameById(UCase$(CStr(item("fundId")))) = CStr(item("name"))
+            End If
+        Next item
+    End If
+End Sub
+
+Private Function LookupBudgetName(ByVal budgetId As String) As String
+    If mBudgetNameById Is Nothing Then
+        LookupBudgetName = ""
+    ElseIf mBudgetNameById.Exists(UCase$(budgetId)) Then
+        LookupBudgetName = CStr(mBudgetNameById(UCase$(budgetId)))
+    Else
+        LookupBudgetName = ""
+    End If
+End Function
+
+Private Function LookupFundName(ByVal fundId As String) As String
+    If mFundNameById Is Nothing Then
+        LookupFundName = ""
+    ElseIf mFundNameById.Exists(UCase$(fundId)) Then
+        LookupFundName = CStr(mFundNameById(UCase$(fundId)))
+    Else
+        LookupFundName = ""
+    End If
+End Function
+
+Private Function FirstFundNameFromLines(lines As Object) As String
+    Dim line As Variant
+    Dim fundId As String
+
+    For Each line In lines
+        fundId = SafeText(ValueOrFallback(line, "fundId", ""))
+        If Len(fundId) > 0 Then
+            FirstFundNameFromLines = LookupFundName(fundId)
+            If Len(FirstFundNameFromLines) = 0 Then FirstFundNameFromLines = fundId
+            Exit Function
+        End If
+    Next line
 End Function
 
 Private Sub WriteTextFile(ByVal path As String, ByVal text As String)
     Dim ff As Integer
     ff = FreeFile
+
+    On Error GoTo CleanFail
     Open path For Output As #ff
-    Print #ff, text
+    Print #ff, text;
     Close #ff
+    Exit Sub
+
+CleanFail:
+    On Error Resume Next
+    Close #ff
+    On Error GoTo 0
+    Err.Raise Err.Number, Err.Source, Err.Description
 End Sub
 
 Private Function ReadTextFile(ByVal path As String) As String
     Dim ff As Integer
     ff = FreeFile
+
+    On Error GoTo CleanFail
     Open path For Input As #ff
     ReadTextFile = Input$(LOF(ff), ff)
     Close #ff
+    Exit Function
+
+CleanFail:
+    On Error Resume Next
+    Close #ff
+    On Error GoTo 0
+    Err.Raise Err.Number, Err.Source, Err.Description
 End Function
