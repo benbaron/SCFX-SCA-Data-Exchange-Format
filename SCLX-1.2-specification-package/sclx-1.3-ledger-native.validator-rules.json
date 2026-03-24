@@ -1,0 +1,182 @@
+{
+  "format": "SCLX-VALIDATOR",
+  "version": "1.3",
+  "description": "Semantic validation rules for SCLX 1.3 with worksheet-native ledger entry support. Transactions may contain one or more lines and are not required to balance unless the producer chooses to emit fully canonical double-entry transactions.",
+  "rules": [
+    {
+      "id": "DOC-001",
+      "severity": "ERROR",
+      "appliesTo": "$",
+      "description": "format must equal SCLX and version must equal 1.3.",
+      "expression": "format == 'SCLX' and version == '1.3'"
+    },
+    {
+      "id": "COA-001",
+      "severity": "ERROR",
+      "appliesTo": "$.chartOfAccounts[*]",
+      "description": "Account Number values must be unique across the chart of accounts.",
+      "expression": "unique(chartOfAccounts[].Number)"
+    },
+    {
+      "id": "COA-002",
+      "severity": "ERROR",
+      "appliesTo": "$.chartOfAccounts[*]",
+      "description": "If Parent is present, it must reference another account Number.",
+      "expression": "forall account in chartOfAccounts: account.Parent is null or exists(chartOfAccounts[Number == account.Parent])"
+    },
+    {
+      "id": "COA-003",
+      "severity": "ERROR",
+      "appliesTo": "$.chartOfAccounts",
+      "description": "The Parent relationship must not contain cycles.",
+      "expression": "acyclic_parent_graph(chartOfAccounts, 'Number', 'Parent')"
+    },
+    {
+      "id": "COA-004",
+      "severity": "WARN",
+      "appliesTo": "$.chartOfAccounts[*]",
+      "description": "IncreaseSide should normally agree with account Type.",
+      "expression": "ASSET/EXPENSE => DEBIT; LIABILITY/NET_ASSETS/REVENUE => CREDIT"
+    },
+    {
+      "id": "TXN-001",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*]",
+      "description": "Each transaction must contain at least one line.",
+      "expression": "count(lines) >= 1"
+    },
+    {
+      "id": "TXN-002",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "A line must not have both debit and credit nonzero.",
+      "expression": "not (decimal(debit) > 0 and decimal(credit) > 0)"
+    },
+    {
+      "id": "TXN-003",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "A line must not have both debit and credit equal to zero.",
+      "expression": "not (decimal(debit) == 0 and decimal(credit) == 0)"
+    },
+    {
+      "id": "TXN-004",
+      "severity": "WARN",
+      "appliesTo": "$.transactions[*]",
+      "description": "When a transaction contains more than one line, producers are encouraged to emit a balanced set of postings when the source system provides enough information to do so.",
+      "expression": "count(lines) == 1 or sum(lines[].debit) == sum(lines[].credit)"
+    },
+    {
+      "id": "REF-001",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "Each line accountId must resolve to a chart of accounts record.",
+      "expression": "exists(chartOfAccounts[accountId == line.accountId or Number == line.accountId])"
+    },
+    {
+      "id": "REF-002",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "If fundId is present, it must resolve to funds.fundId.",
+      "expression": "line.fundId is null or exists(funds[fundId == line.fundId])"
+    },
+    {
+      "id": "REF-003",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "If budgetId is present, it must resolve to budgets.budgetId.",
+      "expression": "line.budgetId is null or exists(budgets[budgetId == line.budgetId])"
+    },
+    {
+      "id": "REF-004",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "If personId is present, it must resolve to people.personId.",
+      "expression": "line.personId is null or exists(people[personId == line.personId])"
+    },
+    {
+      "id": "REF-005",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "If eventId is present, it must resolve to events.eventId.",
+      "expression": "line.eventId is null or exists(events[eventId == line.eventId])"
+    },
+    {
+      "id": "REF-006",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*]",
+      "description": "If documentId is present, it must resolve to documents.documentId.",
+      "expression": "line.documentId is null or exists(documents[documentId == line.documentId])"
+    },
+    {
+      "id": "SUP-001",
+      "severity": "ERROR",
+      "appliesTo": "$.transactions[*].lines[*].supplementalRefs[*]",
+      "description": "Supplemental references must resolve to the correct collection.",
+      "expression": "OUTSTANDING_ITEM => exists(outstandingItems[outstandingItemId == recordId]); OTHER_ASSET_ITEM => exists(otherAssetItems[otherAssetItemId == recordId]); SUPPLEMENTAL_ITEM => exists(supplementalItems[supplementalItemId == recordId])"
+    },
+    {
+      "id": "OUT-001",
+      "severity": "ERROR",
+      "appliesTo": "$.outstandingItems[*]",
+      "description": "If ledgerLink is present, ledgerLink.transactionId and ledgerLink.lineId must resolve to an actual line in transactions. Null ledgerLink is allowed for standalone workbook schedule rows.",
+      "expression": "ledgerLink is null or exists(transactions[transactionId == ledgerLink.transactionId and exists(lines[lineId == ledgerLink.lineId])])"
+    },
+    {
+      "id": "OAI-001",
+      "severity": "ERROR",
+      "appliesTo": "$.otherAssetItems[*]",
+      "description": "ledgerLink.transactionId and ledgerLink.lineId must resolve to an actual line in transactions.",
+      "expression": "exists(transactions[transactionId == ledgerLink.transactionId and exists(lines[lineId == ledgerLink.lineId])])"
+    },
+    {
+      "id": "BANK-001",
+      "severity": "WARN",
+      "appliesTo": "$.bankingItems[*]",
+      "description": "bankAccountId should resolve to an ASSET account when present.",
+      "expression": "bankAccountId is null or exists(chartOfAccounts[(accountId == bankAccountId or Number == bankAccountId) and Type == 'ASSET'])"
+    },
+    {
+      "id": "BANK-002",
+      "severity": "ERROR",
+      "appliesTo": "$.bankingItems[*]",
+      "description": "If transactionId is present, referenced transaction must exist.",
+      "expression": "transactionId is null or exists(transactions[transactionId == bankingItem.transactionId])"
+    },
+    {
+      "id": "BANK-003",
+      "severity": "ERROR",
+      "appliesTo": "$.bankStatementImports[*]",
+      "description": "If documentId is present, it must resolve to documents.documentId.",
+      "expression": "documentId is null or exists(documents[documentId == bankStatementImport.documentId])"
+    },
+    {
+      "id": "BANK-004",
+      "severity": "WARN",
+      "appliesTo": "$.bankingItems[*]",
+      "description": "OFX duplicate detection should use sourceFormat, bank account identity, and fitId.",
+      "expression": "recommended_unique_key = (import.sourceFormat, import.bankAccount.bankId?, import.bankAccount.accountId, ofx.fitId)"
+    },
+    {
+      "id": "ASSET-001",
+      "severity": "WARN",
+      "appliesTo": "$.assets[*]",
+      "description": "When itemCount and valuePerItem are present, approxValueTotal should approximately equal itemCount * valuePerItem.",
+      "expression": "approx_equal(decimal(approxValueTotal), integer(itemCount) * decimal(valuePerItem))"
+    },
+    {
+      "id": "SUPPLY-001",
+      "severity": "ERROR",
+      "appliesTo": "$.supplies[*]",
+      "description": "numberRemoved must not exceed count.",
+      "expression": "removalDetails.numberRemoved is null or count is null or removalDetails.numberRemoved <= count"
+    },
+    {
+      "id": "BUDGET-001",
+      "severity": "WARN",
+      "appliesTo": "$.budgets[*].lines[*]",
+      "description": "If accountId is present on a budget line, it should resolve to chartOfAccounts.",
+      "expression": "accountId is null or exists(chartOfAccounts[accountId == budgetLine.accountId or Number == budgetLine.accountId])"
+    }
+  ]
+}
