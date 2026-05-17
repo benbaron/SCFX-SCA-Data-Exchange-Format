@@ -81,9 +81,11 @@ These do **not** replace core accounting postings. They supplement them.
 
 ## Main Files in This Project (Legacy + Current)
 
-### `sclx-1.2-full.schema.json`
+> Legacy items (including SCLX 1.2 schema/manual/rules and interim VBA modules) have been moved under `legacy/`.
 
-The complete JSON Schema for SCLX 1.2.
+### `sclx-1.3-full.schema.json`
+
+The complete JSON Schema for SCLX 1.3 (current).
 
 This schema defines:
 
@@ -94,7 +96,7 @@ This schema defines:
 - OFX-related preservation blocks
 - asset/supply/budget subsidiary record types
 
-### `sclx-1.2-validator-rules.json`
+### `sclx-1.3-validator-rules.json`
 
 Semantic validation rules that go beyond JSON Schema.
 
@@ -107,7 +109,7 @@ These cover rules such as:
 - supplemental-link resolution
 - selected inventory/budget sanity checks
 
-### `SCLX-1.2-Integrator-Manual-Full.md`
+### `SCLX-1.3-Integrator-Manual-Full.md`
 
 A detailed implementation guide for integrators.
 
@@ -148,7 +150,10 @@ Notes for installing and using the VBA macro package.
 
 ---
 
-## SCLX 1.2 Data Model Overview
+## SCLX Data Model Overview
+
+> Note: this repository also includes SCLX 1.3 schema/manual artifacts for the newer workbook bridge. The 1.2 materials are retained for compatibility and migration support.
+
 
 > Note: this repository also includes SCLX 1.3 schema/manual artifacts for the newer workbook bridge. The 1.2 materials are retained for compatibility and migration support.
 
@@ -385,11 +390,11 @@ A practical repository layout could look like this:
 sclx/
 ├── README.md
 ├── schema/
-│   └── sclx-1.2-full.schema.json
+│   └── sclx-1.3-full.schema.json
 ├── validator/
-│   └── sclx-1.2-validator-rules.json
+│   └── sclx-1.3-validator-rules.json
 ├── docs/
-│   └── SCLX-1.2-Integrator-Manual-Full.md
+│   └── SCLX-1.3-Integrator-Manual-Full.md
 ├── excel/
 │   ├── SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas
 │   └── README-SCLX-VBA.txt
@@ -466,9 +471,9 @@ Suggested placeholders:
 
 ### Validate an SCLX file
 
-1. Load `sclx-1.2-full.schema.json`
+1. Load `sclx-1.3-full.schema.json`
 2. Validate a candidate SCLX document structurally
-3. Apply `sclx-1.2-validator-rules.json`
+3. Apply `sclx-1.3-validator-rules.json`
 4. Reject or warn based on semantic errors
 
 ### Use with Excel workbook integration
@@ -482,7 +487,7 @@ Suggested placeholders:
 
 ## Summary
 
-SCLX 1.2 is a **canonical accounting interchange format** that combines:
+SCLX is a **canonical accounting interchange format** that combines:
 
 - double-entry ledger fidelity
 - master-data structure

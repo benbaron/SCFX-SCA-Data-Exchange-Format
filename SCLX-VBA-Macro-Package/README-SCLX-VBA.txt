@@ -3,10 +3,10 @@ SCLX VBA macro package for the SCA Exchequer Report workbook
 
 Files
 - SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas (current recommended module)
-- SCLX_Ledger_IO_v13_reviewed_fixed_2.bas (older interim variant)
-- SCLX_Ledger_IO_v13_reviewed_fixed.bas (older interim variant)
 - README-SCLX-VBA.txt
 - README-SCLX_Ledger_IO_FIXED.txt
+
+Legacy/interim module variants are stored under `legacy/SCLX-VBA-Macro-Package/`.
 
 What this macro does
 - Exports the current workbook to SCLX JSON
