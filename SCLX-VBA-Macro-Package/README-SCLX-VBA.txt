@@ -8,6 +8,8 @@ Files
 
 Legacy/interim module variants are stored under `legacy/SCLX-VBA-Macro-Package/`.
 
+Legacy/interim module variants and superseded notes are stored under `legacy/SCLX-VBA-Macro-Package/`.
+
 What this macro does
 - Exports the current workbook to SCLX JSON
 - Imports SCLX JSON back into the workbook
