@@ -2,8 +2,11 @@
 SCLX VBA macro package for the SCA Exchequer Report workbook
 
 Files
-- SCLX_Ledger_IO.bas
+- SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas (current recommended module)
 - README-SCLX-VBA.txt
+- README-SCLX_Ledger_IO_FIXED.txt
+
+Legacy/interim module variants are stored under `legacy/SCLX-VBA-Macro-Package/`.
 
 What this macro does
 - Exports the current workbook to SCLX JSON
@@ -19,14 +22,14 @@ Important installation step
 This module uses JsonConverter from VBA-JSON.
 
 Import these modules into the VBA project:
-1. SCLX_Ledger_IO.bas
+1. SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas (recommended)
 2. JsonConverter.bas (from VBA-JSON)
 
 How to install
 1. Open the workbook in Excel.
 2. Press Alt+F11.
 3. File > Import File...
-4. Import SCLX_Ledger_IO.bas
+4. Import SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas
 5. Import JsonConverter.bas
 6. Save the workbook as .xlsm
 
