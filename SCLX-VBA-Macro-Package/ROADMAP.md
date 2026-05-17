@@ -120,7 +120,7 @@ Complete and freeze the 1.3 archive contents:
 * `sclx-1.3-full.schema.json`
 * `sclx-1.3-validator-rules.json`
 * `SCLX-1.3-Integrator-Manual-Full.md`
-* `sclx-1.3.md`
+* `sclx-1.3.md` (legacy; superseded by expanded/full-track docs)
 
 ### 2. Add migration notes
 
