@@ -79,7 +79,7 @@ These do **not** replace core accounting postings. They supplement them.
 
 ---
 
-## Main Files in This Project
+## Main Files in This Project (Legacy + Current)
 
 ### `sclx-1.2-full.schema.json`
 
@@ -120,9 +120,11 @@ This manual explains:
 - how to treat optional subsidiary records
 - how to handle extensions and versioning
 
-### `SCLX_Ledger_IO.bas`
+### `SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas`
 
 A VBA module for exporting/importing SCLX to and from the Excel-based **SCA Exchequer Report** workbook.
+
+This is the recommended current VBA module in this repository. Older similarly named modules are retained as interim/history variants.
 
 This macro currently targets:
 
@@ -140,11 +142,16 @@ and synthesizes a lightweight top-level export for:
 
 ### `README-SCLX-VBA.txt`
 
+Installation notes for the recommended v1.3 documented module and related VBA package files.
+
 Notes for installing and using the VBA macro package.
 
 ---
 
 ## SCLX 1.2 Data Model Overview
+
+> Note: this repository also includes SCLX 1.3 schema/manual artifacts for the newer workbook bridge. The 1.2 materials are retained for compatibility and migration support.
+
 
 A typical SCLX document contains:
 
@@ -384,7 +391,7 @@ sclx/
 ├── docs/
 │   └── SCLX-1.2-Integrator-Manual-Full.md
 ├── excel/
-│   ├── SCLX_Ledger_IO.bas
+│   ├── SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas
 │   └── README-SCLX-VBA.txt
 ├── examples/
 │   ├── minimal-ledger.sclx.json
@@ -467,7 +474,7 @@ Suggested placeholders:
 ### Use with Excel workbook integration
 
 1. Import `JsonConverter.bas` into the workbook VBA project
-2. Import `SCLX_Ledger_IO.bas`
+2. Import `SCLX_Ledger_IO_v13_reviewed_fixed_2_documented.bas`
 3. Save workbook as `.xlsm`
 4. Run `ExportSCLX` or `ImportSCLX`
 
