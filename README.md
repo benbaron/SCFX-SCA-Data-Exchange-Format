@@ -155,6 +155,9 @@ Notes for installing and using the VBA macro package.
 > Note: this repository also includes SCLX 1.3 schema/manual artifacts for the newer workbook bridge. The 1.2 materials are retained for compatibility and migration support.
 
 
+> Note: this repository also includes SCLX 1.3 schema/manual artifacts for the newer workbook bridge. The 1.2 materials are retained for compatibility and migration support.
+
+
 A typical SCLX document contains:
 
 ```text
