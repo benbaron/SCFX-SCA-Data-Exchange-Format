@@ -1,4 +1,4 @@
-# README — Installing `SCLX_Ledger_IO_v13_reviewed.bas` into an Excel Workbook
+# README — Installing `SCLX_Ledger_IO_v13.bas` into an Excel Workbook
 
 ## Purpose
 
@@ -10,7 +10,7 @@ This README explains how to install the SCLX VBA importer/exporter into an Excel
 
 This setup is intended for the workbook based on the **SCA Exchequer Report** layout and the VBA module:
 
-* `SCLX_Ledger_IO_v13_reviewed.bas`
+* `SCLX_Ledger_IO_v13.bas`
 
 It also requires the JSON parsing library module:
 
@@ -24,7 +24,7 @@ Install these VBA modules into the workbook:
 
 1. **Main SCLX VBA module**
 
-   * `SCLX_Ledger_IO_v13_reviewed.bas`
+   * `SCLX_Ledger_IO_v13.bas`
 
 2. **JSON parser dependency**
 
@@ -90,13 +90,13 @@ In the VBA editor:
 
 This adds the JSON parser module to the workbook.
 
-### Step 5. Import `SCLX_Ledger_IO_v13_reviewed.bas`
+### Step 5. Import `SCLX_Ledger_IO_v13.bas`
 
 Again:
 
 * right-click the workbook project
 * choose **Import File...**
-* select `SCLX_Ledger_IO_v13_reviewed.bas`
+* select `SCLX_Ledger_IO_v13.bas`
 
 This adds the SCLX import/export module.
 
@@ -426,7 +426,7 @@ After installation:
 For a reusable package, keep these together:
 
 * the macro-enabled workbook (`.xlsm`)
-* `SCLX_Ledger_IO_v13_reviewed.bas`
+* `SCLX_Ledger_IO_v13.bas`
 * `JsonConverter.bas`
 * the SCLX 1.3 schema
 * the SCLX 1.3 validator rules
@@ -443,7 +443,7 @@ To install the SCLX Excel integration:
 1. Save workbook as `.xlsm`
 2. Open VBA editor with `Alt + F11`
 3. Import `JsonConverter.bas`
-4. Import `SCLX_Ledger_IO_v13_reviewed.bas`
+4. Import `SCLX_Ledger_IO_v13.bas`
 5. Compile the project
 6. Enable macros
 7. Run `ExportSCLX` / `ImportSCLX`
