@@ -1,8 +1,8 @@
-# README — Installing `SCLX_Ledger_IO_v13.bas` into an Excel Workbook
+# README — Installing `SCLX_Ledger_IO_v14_canonical_import.bas` into an Excel Workbook
 
 ## Purpose
 
-This README explains how to install the SCLX VBA importer/exporter into an Excel workbook so the workbook can:
+This README explains how to install the current canonical-import SCLX VBA importer/exporter into an Excel workbook so the workbook can:
 
 * export workbook data to **SCLX 1.3 JSON**
 * import SCLX JSON back into the workbook
@@ -10,7 +10,7 @@ This README explains how to install the SCLX VBA importer/exporter into an Excel
 
 This setup is intended for the workbook based on the **SCA Exchequer Report** layout and the VBA module:
 
-* `SCLX_Ledger_IO_v13.bas`
+* `SCLX_Ledger_IO_v14_canonical_import.bas`
 
 It also requires the JSON parsing library module:
 
@@ -24,7 +24,7 @@ Install these VBA modules into the workbook:
 
 1. **Main SCLX VBA module**
 
-   * `SCLX_Ledger_IO_v13.bas`
+   * `SCLX_Ledger_IO_v14_canonical_import.bas`
 
 2. **JSON parser dependency**
 
@@ -90,13 +90,13 @@ In the VBA editor:
 
 This adds the JSON parser module to the workbook.
 
-### Step 5. Import `SCLX_Ledger_IO_v13.bas`
+### Step 5. Import `SCLX_Ledger_IO_v14_canonical_import.bas`
 
 Again:
 
 * right-click the workbook project
 * choose **Import File...**
-* select `SCLX_Ledger_IO_v13.bas`
+* select `SCLX_Ledger_IO_v14_canonical_import.bas`
 
 This adds the SCLX import/export module.
 
@@ -244,6 +244,10 @@ In Excel:
 * click **Run**
 
 ---
+
+## v14 export reconciliation
+
+The v14 exporter asks once for the Cash asset account used to balance workbook transactions. The generated Cash line remains inside its owning transaction. It omits nonposting annotations and out-of-period rows, emits `INCOME` instead of `REVENUE`, and excludes unsupported schedules that cannot be mapped without guessing.
 
 ## What the installed module expects
 
@@ -426,7 +430,7 @@ After installation:
 For a reusable package, keep these together:
 
 * the macro-enabled workbook (`.xlsm`)
-* `SCLX_Ledger_IO_v13.bas`
+* `SCLX_Ledger_IO_v14_canonical_import.bas`
 * `JsonConverter.bas`
 * the SCLX 1.3 schema
 * the SCLX 1.3 validator rules
@@ -443,7 +447,7 @@ To install the SCLX Excel integration:
 1. Save workbook as `.xlsm`
 2. Open VBA editor with `Alt + F11`
 3. Import `JsonConverter.bas`
-4. Import `SCLX_Ledger_IO_v13.bas`
+4. Import `SCLX_Ledger_IO_v14_canonical_import.bas`
 5. Compile the project
 6. Enable macros
 7. Run `ExportSCLX` / `ImportSCLX`
